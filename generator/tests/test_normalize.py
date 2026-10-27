@@ -6,7 +6,14 @@ import pytest
 from imaging import make_image
 from PIL import Image, ImageCms
 
-from spot_the_forgery.normalize import aspect_ok, normalize, random_name, sniff_media_type
+from spot_the_forgery.normalize import (
+    aspect_of,
+    aspect_ok,
+    crop_to_aspect,
+    normalize,
+    random_name,
+    sniff_media_type,
+)
 
 SVG = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>'
 
@@ -94,6 +101,16 @@ def test_unusable_colour_profile_is_ignored(mode: str, fmt: str, profile):
     icc = ImageCms.ImageCmsProfile(profile).tobytes() if profile else b"not a profile"
     img = _open(normalize(make_image(40, 30, fmt, mode, icc_profile=icc)))
     assert (img.format, img.mode) == ("JPEG", "RGB")
+
+
+def test_exif_rotation_is_applied_not_dropped():
+    """Browsers show a photo tagged "rotate 90°" upright; stripping the tag must not tip it over."""
+    exif = Image.Exif()
+    exif[0x0112] = 6  # Orientation: rotate 90° clockwise to display
+    sideways = make_image(200, 100, exif=exif.tobytes())
+    assert aspect_of(sideways) == 0.5
+    assert _open(normalize(sideways)).size == (512, 1024)
+    assert _open(crop_to_aspect(sideways, 0.25)).size == (50, 200)
 
 
 def test_random_name_deterministic_and_shape():

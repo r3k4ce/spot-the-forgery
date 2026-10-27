@@ -5,7 +5,7 @@ import logging
 import random
 from collections.abc import Sequence
 
-from PIL import Image, ImageCms
+from PIL import Image, ImageCms, ImageOps
 
 log = logging.getLogger(__name__)
 
@@ -19,34 +19,36 @@ _SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB"))
 
 
 def _open(data: bytes) -> Image.Image:
-    img = Image.open(io.BytesIO(data))
-    img.load()
+    """Decode an image the way up it is displayed; ValueError for anything undecodable."""
+    try:
+        img = Image.open(io.BytesIO(data))
+        # Browsers honour the EXIF orientation tag, and normalize strips it, so measure
+        # and re-encode every image as it is shown rather than as it is stored.
+        ImageOps.exif_transpose(img, in_place=True)
+    except Exception as exc:  # Pillow raises several types for undecodable data
+        raise ValueError("not a decodable image") from exc
     return img
 
 
 def sniff_media_type(data: bytes) -> str:
     """Media type of a raster image we accept; ValueError for anything else."""
-    try:
-        fmt = _open(data).format
-    except Exception as exc:  # Pillow raises several types for undecodable data
-        raise ValueError("not a decodable image") from exc
+    fmt = _open(data).format
     if fmt not in _MEDIA_TYPES:
         raise ValueError(f"unsupported image format: {fmt}")
     return _MEDIA_TYPES[fmt]
 
 
-def aspect_ok(data: bytes) -> bool:
-    """True for a decodable image whose width/height is within the allowed range."""
-    try:
-        img = _open(data)
-    except Exception:  # Pillow raises several types for undecodable data
-        return False
-    return MIN_ASPECT <= img.width / img.height <= MAX_ASPECT
-
-
 def aspect_of(data: bytes) -> float:
     img = _open(data)
     return img.width / img.height
+
+
+def aspect_ok(data: bytes) -> bool:
+    """True for a decodable image whose width/height is within the allowed range."""
+    try:
+        return MIN_ASPECT <= aspect_of(data) <= MAX_ASPECT
+    except ValueError:
+        return False
 
 
 def nearest_aspect(ratio: float, allowed: Sequence[str]) -> str:
