@@ -168,9 +168,7 @@ def test_refresh_fetches_and_saves_when_stale(tmp_path):
         httpx.Response(200, json={"info": {"total": 0}, "data": []}),
     ],
 )
-def test_refresh_keeps_stale_cache_on_garbled_or_empty_response(
-    tmp_path, response: httpx.Response
-):
+def test_refresh_keeps_stale_cache_on_garbled_or_empty_response(tmp_path, response: httpx.Response):
     path = tmp_path / "catalog.json"
     stale = NOW - timedelta(days=8)
     save_catalog(_groups(), path, stale)
