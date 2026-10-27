@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -12,6 +13,7 @@ from spot_the_forgery.forger import (
     FALLBACK_MODEL,
     IMAGES_URL,
     PRIMARY_MODEL,
+    ForgerUnavailable,
     OpenRouterImageGenerator,
 )
 from spot_the_forgery.models import Brief, RoundFailed
@@ -123,3 +125,42 @@ def test_budget_exceeded_propagates():
     with pytest.raises(BudgetExceeded):
         gen.generate(BRIEF, REFS)
     assert seen == []
+
+
+@pytest.mark.parametrize("status", [401, 402, 403])
+def test_account_errors_stop_the_run(status: int):
+    budget = Budget(5)
+    gen, seen = generator(lambda body: httpx.Response(status, text="no credits"), budget)
+    with pytest.raises(ForgerUnavailable, match=str(status)):
+        gen.generate(BRIEF, REFS)
+    assert len(seen) == 1
+    assert budget.remaining == 4
+
+
+def test_failure_reason_is_logged_without_the_key(caplog: pytest.LogCaptureFixture):
+    responses = iter([httpx.Response(500, text="upstream exploded"), ok(PNG)])
+    gen, _ = generator(lambda body: next(responses), Budget(5))
+    with caplog.at_level(logging.WARNING):
+        gen.generate(BRIEF, REFS)
+    assert "500" in caplog.text
+    assert "upstream exploded" in caplog.text
+    assert "sk-test" not in caplog.text
+
+
+def test_null_payload_is_a_failed_attempt():
+    responses = iter([httpx.Response(200, json={"data": [{"b64_json": None}]}), ok(PNG)])
+    gen, seen = generator(lambda body: next(responses), Budget(5))
+    assert gen.generate(BRIEF, REFS).data == PNG
+    assert len(seen) == 2
+
+
+def test_cost_is_logged(caplog: pytest.LogCaptureFixture):
+    def costed(body: dict[str, Any]) -> httpx.Response:
+        response = ok(PNG)
+        payload = response.json() | {"usage": {"cost": 0.0042}}
+        return httpx.Response(200, json=payload)
+
+    gen, _ = generator(costed, Budget(5))
+    with caplog.at_level(logging.INFO):
+        gen.generate(BRIEF, REFS)
+    assert "0.0042" in caplog.text

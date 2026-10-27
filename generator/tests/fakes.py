@@ -4,6 +4,7 @@ import io
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
+import httpx
 from imaging import make_image
 from PIL import Image
 
@@ -30,10 +31,18 @@ def width_of(data: bytes) -> int:
 @dataclass
 class FakeFetcher:
     sizes: dict[str, tuple[int, int]] = field(default_factory=dict)
+    broken: set[str] = field(default_factory=set)  # raise like a dead link
+    junk: set[str] = field(default_factory=set)  # answer with an HTML error page
     fetched: list[str] = field(default_factory=list)
 
     def fetch(self, url: str) -> bytes:
         self.fetched.append(url)
+        if url in self.broken:
+            raise httpx.HTTPStatusError(
+                "404", request=httpx.Request("GET", url), response=httpx.Response(404)
+            )
+        if url in self.junk:
+            return b"<html>Service unavailable</html>"
         # The group number is encoded in the URL ("g3/31") and becomes the image width.
         default = (400 + int(url.split("/")[0][1:]), 300)
         return make_image(*self.sizes.get(url, default))
@@ -55,17 +64,19 @@ class FakeBriefWriter:
 class FakeForger:
     fail_calls: set[int] = field(default_factory=set)
     budget_after: int | None = None
+    size: tuple[int, int] | None = None
     calls: int = 0
+    briefs: list[Brief] = field(default_factory=list)
 
     def generate(self, brief: Brief, reference_images: Sequence[bytes]) -> Candidate:
         self.calls += 1
+        self.briefs.append(brief)
         if self.budget_after is not None and self.calls > self.budget_after:
             raise BudgetExceeded("out")
         if self.calls in self.fail_calls:
             raise RoundFailed("image failed")
-        return Candidate(
-            data=make_image(10 + self.calls, 10, "PNG"), media_type="image/png", model="m"
-        )
+        width, height = self.size or (10 + self.calls, 10)
+        return Candidate(data=make_image(width, height, "PNG"), media_type="image/png", model="m")
 
 
 @dataclass

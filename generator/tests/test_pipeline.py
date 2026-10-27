@@ -1,3 +1,4 @@
+import io
 import random
 
 import pytest
@@ -14,6 +15,7 @@ from fakes import (
     scripted,
     width_of,
 )
+from PIL import Image
 
 from spot_the_forgery.budget import BudgetExceeded
 from spot_the_forgery.models import RoundFailed
@@ -105,3 +107,49 @@ def test_budget_exceeded_bubbles_up():
     forger = FakeForger(budget_after=4)
     with pytest.raises(BudgetExceeded):
         build_day(groups, NO_HISTORY, random.Random(1), deps(FakeJudge(by_group_width), forger))
+
+
+def test_dead_shown_link_swapped_from_spares():
+    g = group(1)
+    fetcher = FakeFetcher(broken={g.paintings[0].image_url})
+    built = build_round(pick_of(g), deps(FakeJudge(scripted([5, 5, 5])), fetcher=fetcher))
+    assert [p.id for p in built.pick.shown] == [14, 11, 12]
+
+
+def test_non_image_shown_body_swapped_from_spares():
+    g = group(1)
+    fetcher = FakeFetcher(junk={g.paintings[2].image_url})
+    built = build_round(pick_of(g), deps(FakeJudge(scripted([5, 5, 5])), fetcher=fetcher))
+    assert [p.id for p in built.pick.shown] == [10, 11, 14]
+
+
+@pytest.mark.parametrize("dead", [True, False])
+def test_bad_reference_fails_round(dead: bool):
+    g = group(1)
+    url = {g.paintings[3].image_url}
+    fetcher = FakeFetcher(broken=url) if dead else FakeFetcher(junk=url)
+    with pytest.raises(RoundFailed):
+        build_round(pick_of(g), deps(FakeJudge(scripted([5, 5, 5])), fetcher=fetcher))
+
+
+def test_dead_links_swap_the_group_not_crash_the_day():
+    groups = [group(n) for n in range(8)]
+    dead = {p.image_url for p in groups[2].paintings}
+    rounds = build_day(
+        groups,
+        NO_HISTORY,
+        random.Random(3),
+        deps(FakeJudge(by_group_width), fetcher=FakeFetcher(broken=dead)),
+    )
+    assert len(rounds) == 5
+    assert "g2" not in {r.pick.group.key for r in rounds}
+
+
+def test_fake_takes_the_shape_of_a_shown_painting():
+    g = group(1)
+    fetcher = FakeFetcher(sizes={g.paintings[0].image_url: (500, 300)})
+    forger = FakeForger(size=(300, 300))
+    built = build_round(pick_of(g), deps(FakeJudge(scripted([5, 5, 5])), forger, fetcher=fetcher))
+    assert {b.aspect_ratio for b in forger.briefs} == {"16:9"}
+    fake = Image.open(io.BytesIO(built.fake.data))
+    assert fake.size == (300, 180)

@@ -2,6 +2,7 @@
 
 import io
 import random
+from collections.abc import Sequence
 
 from PIL import Image, ImageCms
 
@@ -32,8 +33,44 @@ def sniff_media_type(data: bytes) -> str:
 
 
 def aspect_ok(data: bytes) -> bool:
-    img = _open(data)
+    """True for a decodable image whose width/height is within the allowed range."""
+    try:
+        img = _open(data)
+    except Exception:  # Pillow raises several types for undecodable data
+        return False
     return MIN_ASPECT <= img.width / img.height <= MAX_ASPECT
+
+
+def aspect_of(data: bytes) -> float:
+    img = _open(data)
+    return img.width / img.height
+
+
+def nearest_aspect(ratio: float, allowed: Sequence[str]) -> str:
+    """The allowed "w:h" string closest to `ratio`."""
+
+    def value(aspect: str) -> float:
+        w, h = aspect.split(":")
+        return int(w) / int(h)
+
+    return min(allowed, key=lambda a: abs(value(a) - ratio))
+
+
+def crop_to_aspect(data: bytes, ratio: float) -> bytes:
+    """Centre-crop to exactly `ratio`, so the fake's shape matches a real painting's."""
+    img = _open(data)
+    w, h = img.size
+    if w / h > ratio:
+        new_w = round(h * ratio)
+        box = ((w - new_w) // 2, 0, (w - new_w) // 2 + new_w, h)
+    else:
+        new_h = round(w / ratio)
+        box = (0, (h - new_h) // 2, w, (h - new_h) // 2 + new_h)
+    out = io.BytesIO()
+    cropped = img.crop(box)
+    icc = img.info.get("icc_profile")
+    cropped.save(out, "PNG", **({"icc_profile": icc} if icc else {}))
+    return out.getvalue()
 
 
 def normalize(data: bytes) -> bytes:

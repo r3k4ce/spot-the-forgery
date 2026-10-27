@@ -8,6 +8,7 @@ from fakes import FakeBriefWriter, FakeFetcher, FakeForger, FakeJudge, by_group_
 
 from spot_the_forgery.budget import Budget
 from spot_the_forgery.cli import main, run_generate
+from spot_the_forgery.forger import ForgerUnavailable
 from spot_the_forgery.models import Brief, Candidate
 from spot_the_forgery.pipeline import Deps
 from spot_the_forgery.publish import load_index
@@ -77,3 +78,19 @@ def test_missing_api_keys_exit_2(monkeypatch: pytest.MonkeyPatch, capsys: pytest
     err = capsys.readouterr().err
     assert "ANTHROPIC_API_KEY" in err
     assert "sk-or-secret-value" not in err
+
+
+class UnavailableForger:
+    def generate(self, brief: Brief, reference_images: Sequence[bytes]) -> Candidate:
+        raise ForgerUnavailable("HTTP 402: no credits")
+
+
+def test_unavailable_image_api_returns_1(tmp_path: Path):
+    deps = Deps(
+        fetcher=FakeFetcher(),
+        brief_writer=FakeBriefWriter(),
+        forger=UnavailableForger(),
+        judge=FakeJudge(by_group_width),
+    )
+    assert run_generate(TODAY, tmp_path, GROUPS, deps, Budget(30), days_ahead=0) == 1
+    assert load_index(tmp_path) == []

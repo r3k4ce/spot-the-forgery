@@ -157,3 +157,17 @@ def test_refresh_fetches_and_saves_when_stale(tmp_path):
     client = httpx.Client(transport=httpx.MockTransport(handler))
     assert refresh_if_stale(path, client, NOW) == _groups()
     assert load_catalog(path) == (_groups(), NOW)
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(200, text="<html>Down for maintenance</html>"),
+        httpx.Response(200, json={"unexpected": True}),
+    ],
+)
+def test_refresh_falls_back_on_garbled_response(tmp_path, response: httpx.Response):
+    path = tmp_path / "catalog.json"
+    save_catalog(_groups(), path, NOW - timedelta(days=8))
+    client = httpx.Client(transport=httpx.MockTransport(lambda request: response))
+    assert refresh_if_stale(path, client, NOW) == _groups()

@@ -14,7 +14,7 @@ import httpx
 from spot_the_forgery.budget import Budget, BudgetExceeded
 from spot_the_forgery.catalog import refresh_if_stale
 from spot_the_forgery.claude import DEFAULT_MODEL, ClaudeBriefWriter, ClaudeJudge
-from spot_the_forgery.forger import OpenRouterImageGenerator
+from spot_the_forgery.forger import ForgerUnavailable, OpenRouterImageGenerator
 from spot_the_forgery.models import Group
 from spot_the_forgery.picker import day_rng
 from spot_the_forgery.pipeline import DayFailed, Deps, build_day
@@ -53,7 +53,7 @@ def run_generate(
             return 0
         try:
             rounds = build_day(groups, load_history(puzzles_dir, day), day_rng(day), deps)
-        except (BudgetExceeded, DayFailed) as exc:
+        except (BudgetExceeded, DayFailed, ForgerUnavailable) as exc:
             log.error("could not build %s: %s", day, exc)
             return 1
         publish_day(puzzles_dir, day, rounds, day_rng(day))

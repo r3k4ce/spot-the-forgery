@@ -1,6 +1,7 @@
 """Cleveland Museum of Art open-access paintings, grouped into puzzle groups."""
 
 import json
+import logging
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timedelta
@@ -10,6 +11,8 @@ from typing import Any
 import httpx
 
 from spot_the_forgery.models import Group, GroupKind, Painting
+
+log = logging.getLogger(__name__)
 
 API_URL = "https://openaccess-api.clevelandart.org/api/artworks/"
 PAGE_SIZE = 1000
@@ -136,9 +139,10 @@ def refresh_if_stale(
         return cached[0]
     try:
         groups = build_groups(fetch_records(client))
-    except httpx.HTTPError:
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         if cached is None:
             raise
+        log.warning("catalog refresh failed (%s); using the cached copy", exc)
         return cached[0]
     save_catalog(groups, path, now)
     return groups

@@ -1,10 +1,14 @@
 """Build a round (one fake among three real paintings) and a full day of rounds."""
 
+import dataclasses
 import logging
 import random
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+import httpx
+
+from spot_the_forgery.claude import SUPPORTED_ASPECTS
 from spot_the_forgery.models import (
     BriefWriter,
     BuiltRound,
@@ -17,9 +21,14 @@ from spot_the_forgery.models import (
     Painting,
     Pick,
     RoundFailed,
-    Verdict,
 )
-from spot_the_forgery.normalize import aspect_ok
+from spot_the_forgery.normalize import (
+    aspect_of,
+    aspect_ok,
+    crop_to_aspect,
+    nearest_aspect,
+    sniff_media_type,
+)
 from spot_the_forgery.picker import ROUNDS_PER_DAY, NotEnoughGroups, pick_day
 
 CANDIDATES_PER_ROUND = 3
@@ -42,17 +51,28 @@ class Deps:
     judge: Judge
 
 
+def _fetch(fetcher: ImageFetcher, painting: Painting) -> bytes | None:
+    """The painting's image, or None for a dead link or a body that isn't an image."""
+    try:
+        data = fetcher.fetch(painting.image_url)
+        sniff_media_type(data)
+    except (httpx.HTTPError, OSError, ValueError) as exc:
+        log.warning("unusable image for painting %s: %s", painting.id, exc)
+        return None
+    return data
+
+
 def _fetch_shown(pick: Pick, fetcher: ImageFetcher) -> tuple[Pick, tuple[bytes, ...]]:
     spares = list(pick.spares)
     shown: list[Painting] = []
     images: list[bytes] = []
     for painting in pick.shown:
-        data = fetcher.fetch(painting.image_url)
-        while not aspect_ok(data):
+        data = _fetch(fetcher, painting)
+        while data is None or not aspect_ok(data):
             if not spares:
-                raise RoundFailed(f"no painting with a usable aspect ratio in {pick.group.key}")
+                raise RoundFailed(f"no usable painting left in {pick.group.key}")
             painting = spares.pop(0)
-            data = fetcher.fetch(painting.image_url)
+            data = _fetch(fetcher, painting)
         shown.append(painting)
         images.append(data)
     swapped = Pick(
@@ -61,8 +81,10 @@ def _fetch_shown(pick: Pick, fetcher: ImageFetcher) -> tuple[Pick, tuple[bytes, 
     return swapped, tuple(images)
 
 
-def _candidates(deps: Deps, pick: Pick, references: Sequence[bytes]) -> list[Candidate]:
-    brief = deps.brief_writer.write(pick, references)
+def _candidates(
+    deps: Deps, pick: Pick, references: Sequence[bytes], aspect: str
+) -> list[Candidate]:
+    brief = dataclasses.replace(deps.brief_writer.write(pick, references), aspect_ratio=aspect)
     candidates: list[Candidate] = []
     for _ in range(CANDIDATES_PER_ROUND):
         try:
@@ -76,15 +98,26 @@ def _candidates(deps: Deps, pick: Pick, references: Sequence[bytes]) -> list[Can
 
 def build_round(pick: Pick, deps: Deps) -> BuiltRound:
     pick, shown_images = _fetch_shown(pick, deps.fetcher)
-    references = [deps.fetcher.fetch(p.image_url) for p in pick.references]
-    best: tuple[Candidate, Verdict] | None = None
+    references: list[bytes] = []
+    for painting in pick.references:
+        data = _fetch(deps.fetcher, painting)
+        if data is None:
+            raise RoundFailed(f"reference painting {painting.id} is unavailable")
+        references.append(data)
+    # The fake takes the exact shape of the first shown painting, so its proportions
+    # don't stand out from the real ones.
+    target = aspect_of(shown_images[0])
+    aspect = nearest_aspect(target, SUPPORTED_ASPECTS)
     for attempt in range(1, ATTEMPTS_PER_ROUND + 1):
-        candidates = _candidates(deps, pick, references)
+        candidates = _candidates(deps, pick, references, aspect)
         verdicts = deps.judge.judge(shown_images, candidates)
-        best = max(zip(candidates, verdicts, strict=True), key=lambda cv: cv[1].convincing)
-        log.info("%s attempt %d: best score %d", pick.group.label, attempt, best[1].convincing)
-        if best[1].convincing >= MIN_CONVINCING:
-            return BuiltRound(pick=pick, shown_images=shown_images, fake=best[0], verdict=best[1])
+        best, verdict = max(zip(candidates, verdicts, strict=True), key=lambda cv: cv[1].convincing)
+        log.info("%s attempt %d: best score %d", pick.group.label, attempt, verdict.convincing)
+        if verdict.convincing >= MIN_CONVINCING:
+            fake = dataclasses.replace(
+                best, data=crop_to_aspect(best.data, target), media_type="image/png"
+            )
+            return BuiltRound(pick=pick, shown_images=shown_images, fake=fake, verdict=verdict)
     raise RoundFailed(f"forgeries for {pick.group.key} were too obvious")
 
 

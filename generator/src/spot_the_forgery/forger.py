@@ -18,7 +18,14 @@ FALLBACK_MODEL = "tencent/hy-image-v3.5-preview"
 ATTEMPTS_PER_MODEL = 2
 TIMEOUT_SECONDS = 120
 
+# The account can't make images (bad key, no credits): retrying only burns the budget.
+FATAL_STATUSES = frozenset({401, 402, 403})
+
 log = logging.getLogger(__name__)
+
+
+class ForgerUnavailable(Exception):
+    """The image API refused the account itself; the run should stop."""
 
 
 def _data_url(data: bytes) -> str:
@@ -60,13 +67,13 @@ class OpenRouterImageGenerator:
             }
             for attempt in range(1, ATTEMPTS_PER_MODEL + 1):
                 self._budget.spend()
-                candidate = self._attempt(model, body)
-                if candidate is not None:
-                    return candidate
-                log.warning("image attempt %d with %s failed", attempt, model)
+                try:
+                    return self._attempt(model, body)
+                except RoundFailed as exc:
+                    log.warning("image attempt %d with %s failed: %s", attempt, model, exc)
         raise RoundFailed("every image model failed")
 
-    def _attempt(self, model: str, body: dict[str, Any]) -> Candidate | None:
+    def _attempt(self, model: str, body: dict[str, Any]) -> Candidate:
         try:
             response = self._client.post(
                 IMAGES_URL,
@@ -74,8 +81,18 @@ class OpenRouterImageGenerator:
                 headers={"Authorization": f"Bearer {self._api_key}"},
                 timeout=TIMEOUT_SECONDS,
             )
-            response.raise_for_status()
-            data = base64.b64decode(response.json()["data"][0]["b64_json"], validate=True)
-            return Candidate(data=data, media_type=sniff_media_type(data), model=model)
-        except (httpx.HTTPError, KeyError, IndexError, ValueError, binascii.Error):
-            return None
+        except httpx.HTTPError as exc:
+            raise RoundFailed(f"{type(exc).__name__}: {exc}") from exc
+        if response.status_code in FATAL_STATUSES:
+            raise ForgerUnavailable(f"HTTP {response.status_code}: {response.text[:200]}")
+        if response.is_error:
+            raise RoundFailed(f"HTTP {response.status_code}: {response.text[:200]}")
+        try:
+            payload = response.json()
+            data = base64.b64decode(payload["data"][0]["b64_json"], validate=True)
+            media_type = sniff_media_type(data)
+        except (KeyError, IndexError, TypeError, ValueError, binascii.Error) as exc:
+            raise RoundFailed(f"unusable response: {type(exc).__name__}: {exc}") from exc
+        cost = (payload.get("usage") or {}).get("cost")
+        log.info("image from %s (%s, cost %s)", model, media_type, cost)
+        return Candidate(data=data, media_type=media_type, model=model)
