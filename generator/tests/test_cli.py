@@ -131,6 +131,12 @@ def test_generate_passes_its_flags_through(wiring: dict[str, Any]):
     }
 
 
+def test_generate_builds_only_today_by_default(wiring: dict[str, Any]):
+    # Puzzles are weekly, so a plain `stf generate` must not build the next few days too.
+    assert main(["generate"]) == 0
+    assert wiring["days_ahead"] == 0
+
+
 def test_dry_run_builds_one_date_into_its_folder(wiring: dict[str, Any]):
     assert main(["dry-run", "--date", "2026-11-02", "--out", "scratch"]) == 0
     assert (wiring["today"], wiring["puzzles_dir"]) == (date(2026, 11, 2), Path("scratch"))

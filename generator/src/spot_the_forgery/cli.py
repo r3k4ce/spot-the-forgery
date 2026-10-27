@@ -1,4 +1,4 @@
-"""`stf` command: build upcoming puzzles into the static site."""
+"""`stf` command: build puzzles into the static site."""
 
 import argparse
 import logging
@@ -76,10 +76,15 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="stf", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    generate = sub.add_parser("generate", help="build puzzles for today through today + N")
+    generate = sub.add_parser(
+        "generate", help="build today's puzzle, plus the next N days with --days-ahead N"
+    )
     generate.add_argument("--puzzles-dir", type=Path, default=Path("../frontend/public/puzzles"))
     generate.add_argument("--catalog", type=Path, default=Path("data/catalog.json"))
-    generate.add_argument("--days-ahead", type=int, default=3)
+    # Puzzles are weekly, so by default only today's is built.
+    generate.add_argument(
+        "--days-ahead", type=int, default=0, metavar="N", help="also build the next N days"
+    )
     generate.add_argument("--max-images", type=int, default=30)
     generate.add_argument("--today", type=date.fromisoformat, default=None)
 
