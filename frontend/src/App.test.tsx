@@ -73,7 +73,7 @@ beforeEach(() => {
   localStorage.setItem("stf:seen-help", "true");
   window.location.hash = "";
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
-  vi.mocked(loadPuzzle).mockImplementation(async (_base, _now, _fetch, date) => ({
+  vi.mocked(loadPuzzle).mockImplementation(async (date) => ({
     puzzle: date === OLD_PUZZLE.date ? OLD_PUZZLE : PUZZLE,
     dates: DATES,
   }));
@@ -423,12 +423,7 @@ describe("the archive", () => {
     await user.click(await screen.findByRole("link", { name: /Puzzle #1/ }));
     expect(await title("Spot the Forgery #1")).toBeInTheDocument();
     expect(screen.getByText("2026-10-19")).toBeInTheDocument();
-    expect(loadPuzzle).toHaveBeenLastCalledWith(
-      expect.anything(),
-      undefined,
-      undefined,
-      "2026-10-19",
-    );
+    expect(loadPuzzle).toHaveBeenLastCalledWith("2026-10-19");
 
     await user.click(screen.getByRole("link", { name: "Back to the latest puzzle" }));
     expect(await title("Spot the Forgery #7")).toBeInTheDocument();

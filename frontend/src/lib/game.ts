@@ -1,4 +1,10 @@
-import type { DayResult } from "./types";
+import type { History } from "./storage";
+import type { SealedPayload } from "./types";
+
+// Whether each guess so far found the forgery.
+export function checkGuesses(guesses: number[], answers: SealedPayload): boolean[] {
+  return guesses.map((g, i) => g === answers.rounds[i]?.fakeIndex);
+}
 
 export function score(results: boolean[]): number {
   return results.filter(Boolean).length;
@@ -9,11 +15,13 @@ export function shareText(number: number, results: boolean[], url: string): stri
   return `Spot the Forgery #${number} 🖼️\n${squares} ${score(results)}/${results.length}\n${url}`;
 }
 
+export interface Streaks {
+  current: number;
+  best: number;
+}
+
 // Streaks count consecutive published puzzles, so a weekly puzzle keeps them going.
-export function computeStreaks(
-  history: Record<string, DayResult>,
-  dates: string[],
-): { current: number; best: number } {
+export function computeStreaks(history: History, dates: string[]): Streaks {
   const played = dates.map((d) => d in history);
   const runEndingAt = (end: number) => {
     let n = 0;

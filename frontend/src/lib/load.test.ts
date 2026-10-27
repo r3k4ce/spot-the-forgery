@@ -1,4 +1,4 @@
-import { loadPuzzle, pickDate, todayUtc } from "./load";
+import { loadPuzzle, todayUtc } from "./load";
 
 const NOW = new Date("2026-10-26T12:00:00Z");
 
@@ -18,31 +18,17 @@ it("uses the UTC calendar date", () => {
   expect(todayUtc(new Date("2026-10-27T08:00:00+09:00"))).toBe("2026-10-26");
 });
 
-describe("pickDate", () => {
-  it("prefers today", () => {
-    expect(pickDate(["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28"], "2026-10-26")).toBe(
-      "2026-10-26",
-    );
-  });
-
-  it("falls back to the latest earlier date", () => {
-    expect(pickDate(["2026-10-24", "2026-10-28"], "2026-10-26")).toBe("2026-10-24");
-  });
-
-  it("never returns a future date", () => {
-    expect(pickDate(["2026-10-28"], "2026-10-26")).toBeNull();
-  });
-});
-
 describe("loadPuzzle", () => {
   const puzzle = { date: "2026-10-26", number: 1, rounds: [], sealed: "" };
+  const load = (fetchFn: typeof fetch, requested?: string) =>
+    loadPuzzle(requested, { base: "./", now: NOW, fetchFn });
 
   it("fetches only today's puzzle when future dates are listed", async () => {
     const { fn, calls } = stubFetch({
       "./puzzles/index.json": ["2026-10-19", "2026-10-26", "2026-10-27", "2026-10-28"],
       "./puzzles/2026-10-26/puzzle.json": puzzle,
     });
-    expect(await loadPuzzle("./", NOW, fn)).toEqual({
+    expect(await load(fn)).toEqual({
       puzzle,
       dates: ["2026-10-19", "2026-10-26"],
     });
@@ -55,7 +41,7 @@ describe("loadPuzzle", () => {
       "./puzzles/index.json": ["2026-10-12", "2026-10-19", "2026-11-02"],
       "./puzzles/2026-10-19/puzzle.json": earlier,
     });
-    expect(await loadPuzzle("./", NOW, fn)).toEqual({
+    expect(await load(fn)).toEqual({
       puzzle: earlier,
       dates: ["2026-10-12", "2026-10-19"],
     });
@@ -67,7 +53,7 @@ describe("loadPuzzle", () => {
       "./puzzles/index.json": ["2026-10-19", "2026-10-26"],
       "./puzzles/2026-10-19/puzzle.json": earlier,
     });
-    expect(await loadPuzzle("./", NOW, fn, "2026-10-19")).toEqual({
+    expect(await load(fn, "2026-10-19")).toEqual({
       puzzle: earlier,
       dates: ["2026-10-19", "2026-10-26"],
     });
@@ -78,22 +64,26 @@ describe("loadPuzzle", () => {
       "./puzzles/index.json": ["2026-10-19", "2026-10-26", "2026-11-02"],
       "./puzzles/2026-10-26/puzzle.json": puzzle,
     });
-    expect((await loadPuzzle("./", NOW, fn, "2026-11-02"))?.puzzle).toEqual(puzzle);
-    expect((await loadPuzzle("./", NOW, fn, "nonsense"))?.puzzle).toEqual(puzzle);
+    expect((await load(fn, "2026-11-02"))?.puzzle).toEqual(puzzle);
+    expect((await load(fn, "nonsense"))?.puzzle).toEqual(puzzle);
   });
 
   it("resolves null when the network fails", async () => {
     const fn = (() => Promise.reject(new TypeError("offline"))) as typeof fetch;
-    expect(await loadPuzzle("./", NOW, fn)).toBeNull();
+    expect(await load(fn)).toBeNull();
   });
 
   it("resolves null when the index is missing", async () => {
-    expect(await loadPuzzle("./", NOW, stubFetch({}).fn)).toBeNull();
+    expect(await load(stubFetch({}).fn)).toBeNull();
+  });
+
+  it("resolves null when the index is not a list", async () => {
+    expect(await load(stubFetch({ "./puzzles/index.json": { dates: [] } }).fn)).toBeNull();
   });
 
   it("resolves null when only future puzzles exist", async () => {
     const { fn, calls } = stubFetch({ "./puzzles/index.json": ["2026-10-27"] });
-    expect(await loadPuzzle("./", NOW, fn)).toBeNull();
+    expect(await load(fn)).toBeNull();
     expect(calls).toEqual(["./puzzles/index.json"]);
   });
 });

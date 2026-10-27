@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
-import { preload } from "react-dom";
 import { Archive } from "./components/Archive";
+import { Game } from "./components/Game";
 import { Help } from "./components/Help";
-import { Progress } from "./components/Progress";
-import { RoundView } from "./components/RoundView";
-import { Summary } from "./components/Summary";
-import { computeStreaks, nextPuzzleTime, score, shuffledOrder } from "./lib/game";
+import { checkGuesses, score, shuffledOrder } from "./lib/game";
 import { loadPuzzle } from "./lib/load";
-import { ARCHIVE_HREF, LATEST_HREF, parseRoute, puzzleHref } from "./lib/route";
+import { ARCHIVE_HREF, LATEST_HREF, parseRoute } from "./lib/route";
 import { unseal } from "./lib/seal";
 import {
   hasSeenHelp,
@@ -18,8 +15,6 @@ import {
   saveProgress,
 } from "./lib/storage";
 import type { Puzzle, SealedPayload } from "./lib/types";
-
-const BASE = import.meta.env.BASE_URL;
 
 // Each result remembers which date it was loaded for, so a stale one reads as loading.
 type Loaded = { key: string | undefined } & (
@@ -56,7 +51,7 @@ export default function App() {
     const key = requested;
     (async () => {
       // The archive needs the list of dates, which comes with the latest puzzle.
-      const result = await loadPuzzle(BASE, undefined, undefined, key);
+      const result = await loadPuzzle(key);
       if (cancelled) return;
       if (!result) return setLoaded({ key, status: "missing" });
       const { puzzle, dates } = result;
@@ -64,7 +59,7 @@ export default function App() {
         // Answers stay hidden in state until each round is guessed.
         const answers = await unseal(puzzle.sealed, puzzle.date);
         if (cancelled) return;
-        setGuesses(loadProgress(puzzle.date).guesses.slice(0, puzzle.rounds.length));
+        setGuesses(loadProgress(puzzle.date).slice(0, puzzle.rounds.length));
         setLoaded({ key, status: "ready", puzzle, dates, answers });
       } catch {
         if (!cancelled) setLoaded({ key, status: "error" });
@@ -124,29 +119,28 @@ export default function App() {
           {showPuzzle && (
             <Game
               puzzle={load.puzzle}
-              dates={load.dates}
-              isLatest={isLatest}
               answers={load.answers}
+              dates={load.dates}
               guesses={guesses}
               revealing={revealing}
+              orders={shuffle?.date === load.puzzle.date ? shuffle.orders : undefined}
               onGuess={(index) => {
+                const { date, rounds } = load.puzzle;
                 const next = [...guesses, index];
-                saveProgress({ date: load.puzzle.date, guesses: next });
+                saveProgress(date, next);
                 setGuesses(next);
                 setRevealing(true);
-                const total = load.puzzle.rounds.length;
                 // A replay doesn't change the score that counts: only the first finish is kept.
-                if (next.length === total && !(load.puzzle.date in loadHistory())) {
-                  const results = next.map((g, i) => g === load.answers.rounds[i]?.fakeIndex);
-                  recordResult(load.puzzle.date, { score: score(results), total });
+                if (next.length === rounds.length && !(date in loadHistory())) {
+                  const results = checkGuesses(next, load.answers);
+                  recordResult(date, { score: score(results), total: rounds.length });
                 }
               }}
               onNext={() => setRevealing(false)}
-              orders={shuffle?.date === load.puzzle.date ? shuffle.orders : undefined}
               onReplay={() => {
                 const { date, rounds } = load.puzzle;
                 setShuffle({ date, orders: rounds.map((r) => shuffledOrder(r.images.length)) });
-                saveProgress({ date: load.puzzle.date, guesses: [] });
+                saveProgress(date, []);
                 setGuesses([]);
                 setRevealing(false);
               }}
@@ -169,90 +163,5 @@ export default function App() {
         </footer>
       </div>
     </div>
-  );
-}
-
-// The latest puzzle shares the plain address; a past one links straight to itself.
-function shareUrl(date: string, isLatest: boolean): string {
-  const page = location.href.split("#")[0];
-  return isLatest ? page : `${page}${puzzleHref(date)}`;
-}
-
-interface GameProps {
-  puzzle: Puzzle;
-  dates: string[];
-  isLatest: boolean;
-  answers: SealedPayload;
-  guesses: number[];
-  revealing: boolean;
-  onGuess: (index: number) => void;
-  onNext: () => void;
-  orders: number[][] | undefined;
-  onReplay: () => void;
-}
-
-function Game({
-  puzzle,
-  dates,
-  isLatest,
-  answers,
-  guesses,
-  revealing,
-  onGuess,
-  onNext,
-  orders,
-  onReplay,
-}: GameProps) {
-  const total = puzzle.rounds.length;
-  if (guesses.length >= total && !revealing) {
-    const results = guesses.map((g, i) => g === answers.rounds[i]?.fakeIndex);
-    return (
-      <Summary
-        puzzle={puzzle}
-        results={results}
-        streaks={computeStreaks(loadHistory(), dates)}
-        shareUrl={shareUrl(puzzle.date, isLatest)}
-        answers={answers}
-        guesses={guesses}
-        imageUrl={(file) => `${BASE}puzzles/${puzzle.date}/${file}`}
-        nextPuzzle={isLatest ? nextPuzzleTime(puzzle.date) : null}
-        onReplay={onReplay}
-      />
-    );
-  }
-
-  const index = revealing ? guesses.length - 1 : guesses.length;
-  // Fetch the next round's paintings while this one is played, so Next round is instant.
-  for (const file of puzzle.rounds[index + 1]?.images ?? []) {
-    preload(`${BASE}puzzles/${puzzle.date}/${file}`, { as: "image" });
-  }
-  const results = guesses.map((g, i) => g === answers.rounds[i]?.fakeIndex);
-  return (
-    <>
-      <Progress results={results} current={index} total={total} />
-      <p className="mb-2 text-center text-sm text-stone-400">
-        Round {index + 1} of {total}
-      </p>
-      <RoundView
-        key={index}
-        round={puzzle.rounds[index]}
-        base={BASE}
-        date={puzzle.date}
-        reveal={revealing ? (answers.rounds[index] ?? null) : null}
-        order={orders?.[index]}
-        onGuess={onGuess}
-      />
-      {revealing && (
-        <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={onNext}
-            className="rounded border border-amber-400 px-6 py-3 font-semibold text-amber-300 hover:bg-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
-          >
-            {guesses.length === total ? "See results" : "Next round"}
-          </button>
-        </div>
-      )}
-    </>
   );
 }

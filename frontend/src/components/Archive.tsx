@@ -8,7 +8,7 @@ interface Props {
 function status(date: string, history: ReturnType<typeof loadHistory>): string {
   const result = history[date];
   if (result) return `Scored ${result.score}/${result.total}`;
-  return loadProgress(date).guesses.length > 0 ? "In progress" : "Not played";
+  return loadProgress(date).length > 0 ? "In progress" : "Not played";
 }
 
 export function Archive({ dates }: Props) {

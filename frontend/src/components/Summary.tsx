@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { formatCountdown, score, shareText } from "../lib/game";
+import { formatCountdown, score, shareText, type Streaks } from "../lib/game";
 import type { Puzzle, SealedPayload } from "../lib/types";
 import { Review } from "./Review";
 
 interface Props {
   puzzle: Puzzle;
   results: boolean[];
-  streaks: { current: number; best: number };
+  streaks: Streaks;
   shareUrl: string;
   answers: SealedPayload;
   guesses: number[];

@@ -1,4 +1,5 @@
 import {
+  checkGuesses,
   computeStreaks,
   formatCountdown,
   nextPuzzleTime,
@@ -13,6 +14,13 @@ const played: DayResult = { score: 3, total: 5 };
 function history(...dates: string[]): Record<string, DayResult> {
   return Object.fromEntries(dates.map((d) => [d, played]));
 }
+
+it("checks each guess against the forgery's position", () => {
+  const answers = { rounds: [0, 3, 1].map((fakeIndex) => ({ fakeIndex, note: "", real: [] })) };
+  expect(checkGuesses([0, 2, 1], answers)).toEqual([true, false, true]);
+  // Guesses beyond the answers (corrupt progress) count as misses.
+  expect(checkGuesses([0, 3, 1, 2], answers)).toEqual([true, true, true, false]);
+});
 
 it("scores correct answers", () => {
   expect(score([true, false, true, true, false])).toBe(3);

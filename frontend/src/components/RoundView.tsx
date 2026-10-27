@@ -4,8 +4,7 @@ import { Lightbox } from "./Lightbox";
 
 interface Props {
   round: PuzzleRound;
-  base: string;
-  date: string;
+  imageUrl: (file: string) => string;
   reveal: RoundReveal | null;
   // Which painting sits in each position (a replay shuffles them); guesses use the
   // painting's own index, so answers still match.
@@ -19,7 +18,7 @@ function roundTitle(round: PuzzleRound): string {
     : `Four paintings from ${round.label}`;
 }
 
-export function RoundView({ round, base, date, reveal, order: shuffled, onGuess }: Props) {
+export function RoundView({ round, imageUrl, reveal, order: shuffled, onGuess }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   // A position on screen, not a painting index.
   const [zoomed, setZoomed] = useState<number | null>(null);
@@ -38,8 +37,7 @@ export function RoundView({ round, base, date, reveal, order: shuffled, onGuess 
   );
   const prev = useCallback(() => browse(-1), [browse]);
   const next = useCallback(() => browse(1), [browse]);
-  const src = (file: string) => `${base}puzzles/${date}/${file}`;
-  const alt = (i: number) => `Painting ${i + 1} of ${round.images.length}`;
+  const alt = (position: number) => `Painting ${position + 1} of ${count}`;
 
   return (
     <section aria-labelledby="round-title">
@@ -71,7 +69,11 @@ export function RoundView({ round, base, date, reveal, order: shuffled, onGuess 
                 }}
                 className={`block aspect-square w-full overflow-hidden rounded bg-stone-900 ${ring} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400`}
               >
-                <img src={src(file)} alt={alt(position)} className="h-full w-full object-contain" />
+                <img
+                  src={imageUrl(file)}
+                  alt={alt(position)}
+                  className="h-full w-full object-contain"
+                />
               </button>
               {reveal && (
                 <figcaption className="mt-2 text-sm">
@@ -108,7 +110,9 @@ export function RoundView({ round, base, date, reveal, order: shuffled, onGuess 
         {reveal && (
           <>
             <p className="text-lg font-semibold">
-              {selected === reveal.fakeIndex ? "Correct — you spotted the forgery." : "Not this time."}
+              {selected === reveal.fakeIndex
+                ? "Correct — you spotted the forgery."
+                : "Not this time."}
             </p>
             <p className="mx-auto mt-2 max-w-prose text-stone-300">{reveal.note}</p>
           </>
@@ -130,7 +134,7 @@ export function RoundView({ round, base, date, reveal, order: shuffled, onGuess 
 
       {zoomed !== null && (
         <Lightbox
-          src={src(round.images[order[zoomed]])}
+          src={imageUrl(round.images[order[zoomed]])}
           alt={alt(zoomed)}
           onClose={closeZoom}
           onPrev={prev}
