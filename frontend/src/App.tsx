@@ -47,7 +47,7 @@ export default function App() {
       // The archive needs the list of dates, which comes with the latest puzzle.
       const result = await loadPuzzle(key);
       if (cancelled) return;
-      if (!result) return setLoaded({ key, status: "missing" });
+      if (result.status !== "ready") return setLoaded({ key, status: result.status });
       const { puzzle, dates } = result;
       try {
         // Answers stay hidden in state until each round is guessed.

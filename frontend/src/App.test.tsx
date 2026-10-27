@@ -74,6 +74,7 @@ beforeEach(() => {
   window.location.hash = "";
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   vi.mocked(loadPuzzle).mockImplementation(async (date) => ({
+    status: "ready",
     puzzle: date === OLD_PUZZLE.date ? OLD_PUZZLE : PUZZLE,
     dates: DATES,
   }));
@@ -682,9 +683,17 @@ it("keeps keyboard focus inside the help", async () => {
 });
 
 it("says when there is no puzzle", async () => {
-  vi.mocked(loadPuzzle).mockResolvedValue(null);
+  vi.mocked(loadPuzzle).mockResolvedValue({ status: "missing" });
   render(<App />);
   expect(await screen.findByText("No puzzle yet — check back soon.")).toBeInTheDocument();
+});
+
+it("says when the puzzle couldn't be loaded, rather than that there is none", async () => {
+  vi.mocked(loadPuzzle).mockResolvedValue({ status: "error" });
+  render(<App />);
+  const message = "This puzzle couldn't be opened. Try reloading the page.";
+  expect(await screen.findByText(message)).toBeInTheDocument();
+  expect(screen.queryByText("No puzzle yet — check back soon.")).not.toBeInTheDocument();
 });
 
 it("says when the puzzle can't be opened", async () => {

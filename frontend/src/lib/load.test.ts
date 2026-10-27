@@ -19,7 +19,12 @@ it("uses the UTC calendar date", () => {
 });
 
 describe("loadPuzzle", () => {
-  const puzzle = { date: "2026-10-26", number: 1, rounds: [], sealed: "" };
+  const puzzle = {
+    date: "2026-10-26",
+    number: 1,
+    sealed: "",
+    rounds: [{ label: "Thomas Eakins", images: ["a1.jpg", "a2.jpg"] }],
+  };
   const load = (fetchFn: typeof fetch, requested?: string) =>
     loadPuzzle(requested, { base: "./", now: NOW, fetchFn });
 
@@ -29,6 +34,7 @@ describe("loadPuzzle", () => {
       "./puzzles/2026-10-26/puzzle.json": puzzle,
     });
     expect(await load(fn)).toEqual({
+      status: "ready",
       puzzle,
       dates: ["2026-10-19", "2026-10-26"],
     });
@@ -42,6 +48,7 @@ describe("loadPuzzle", () => {
       "./puzzles/2026-10-19/puzzle.json": earlier,
     });
     expect(await load(fn)).toEqual({
+      status: "ready",
       puzzle: earlier,
       dates: ["2026-10-12", "2026-10-19"],
     });
@@ -54,6 +61,7 @@ describe("loadPuzzle", () => {
       "./puzzles/2026-10-19/puzzle.json": earlier,
     });
     expect(await load(fn, "2026-10-19")).toEqual({
+      status: "ready",
       puzzle: earlier,
       dates: ["2026-10-19", "2026-10-26"],
     });
@@ -64,26 +72,58 @@ describe("loadPuzzle", () => {
       "./puzzles/index.json": ["2026-10-19", "2026-10-26", "2026-11-02"],
       "./puzzles/2026-10-26/puzzle.json": puzzle,
     });
-    expect((await load(fn, "2026-11-02"))?.puzzle).toEqual(puzzle);
-    expect((await load(fn, "nonsense"))?.puzzle).toEqual(puzzle);
+    expect(await load(fn, "2026-11-02")).toMatchObject({ puzzle });
+    expect(await load(fn, "nonsense")).toMatchObject({ puzzle });
   });
 
-  it("resolves null when the network fails", async () => {
-    const fn = (() => Promise.reject(new TypeError("offline"))) as typeof fetch;
-    expect(await load(fn)).toBeNull();
+  it("finds no puzzle yet when the index is missing", async () => {
+    expect(await load(stubFetch({}).fn)).toEqual({ status: "missing" });
   });
 
-  it("resolves null when the index is missing", async () => {
-    expect(await load(stubFetch({}).fn)).toBeNull();
-  });
-
-  it("resolves null when the index is not a list", async () => {
-    expect(await load(stubFetch({ "./puzzles/index.json": { dates: [] } }).fn)).toBeNull();
-  });
-
-  it("resolves null when only future puzzles exist", async () => {
+  it("finds no puzzle yet when only future puzzles exist", async () => {
     const { fn, calls } = stubFetch({ "./puzzles/index.json": ["2026-10-27"] });
-    expect(await load(fn)).toBeNull();
+    expect(await load(fn)).toEqual({ status: "missing" });
     expect(calls).toEqual(["./puzzles/index.json"]);
+  });
+
+  it("fails when the network fails", async () => {
+    const fn = (() => Promise.reject(new TypeError("offline"))) as typeof fetch;
+    expect(await load(fn)).toEqual({ status: "error" });
+  });
+
+  it("fails on a server error rather than reporting no puzzle", async () => {
+    const fn = (async () => new Response("down", { status: 503 })) as typeof fetch;
+    expect(await load(fn)).toEqual({ status: "error" });
+  });
+
+  it("fails when the index isn't a list of dates", async () => {
+    const notJson = (async () => new Response("<html>")) as typeof fetch;
+    expect(await load(notJson)).toEqual({ status: "error" });
+    expect(await load(stubFetch({ "./puzzles/index.json": { dates: [] } }).fn)).toEqual({
+      status: "error",
+    });
+  });
+
+  it("fails when a listed puzzle is missing", async () => {
+    const { fn } = stubFetch({ "./puzzles/index.json": ["2026-10-26"] });
+    expect(await load(fn)).toEqual({ status: "error" });
+  });
+
+  it.each([
+    ["not an object", [puzzle]],
+    ["no date", { ...puzzle, date: undefined }],
+    ["no number", { ...puzzle, number: "1" }],
+    ["no sealed answers", { ...puzzle, sealed: null }],
+    ["no rounds", { ...puzzle, rounds: "none" }],
+    ["a round that isn't an object", { ...puzzle, rounds: [null] }],
+    ["a round without a label", { ...puzzle, rounds: [{ images: ["a1.jpg"] }] }],
+    ["a round without images", { ...puzzle, rounds: [{ label: "x" }] }],
+    ["an image that isn't a file name", { ...puzzle, rounds: [{ label: "x", images: [1] }] }],
+  ])("fails on a puzzle with %s", async (_, malformed) => {
+    const { fn } = stubFetch({
+      "./puzzles/index.json": ["2026-10-26"],
+      "./puzzles/2026-10-26/puzzle.json": malformed,
+    });
+    expect(await load(fn)).toEqual({ status: "error" });
   });
 });
