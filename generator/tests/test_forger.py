@@ -16,9 +16,10 @@ from spot_the_forgery.forger import (
     ForgerUnavailable,
     OpenRouterImageGenerator,
 )
-from spot_the_forgery.models import Brief, RoundFailed
+from spot_the_forgery.models import AspectRatio, Brief, RoundFailed
 
-BRIEF = Brief(prompt="A river at dusk", aspect_ratio="3:2", forbidden=("electric light", "plastic"))
+BRIEF = Brief(prompt="A river at dusk", forbidden=("electric light", "plastic"))
+ASPECT: AspectRatio = "3:2"
 REFS = [make_image(30, 20, "JPEG")]
 PNG = make_image(64, 48, "PNG")
 
@@ -43,7 +44,7 @@ def generator(
 
 def test_request_shape():
     gen, seen = generator(lambda body: ok(PNG), Budget(5))
-    gen.generate(BRIEF, REFS)
+    gen.generate(BRIEF, REFS, ASPECT)
     request = seen[0]
     assert str(request.url) == IMAGES_URL
     assert request.method == "POST"
@@ -63,7 +64,7 @@ def test_request_shape():
 def test_success_returns_candidate():
     budget = Budget(5)
     gen, _ = generator(lambda body: ok(PNG), budget)
-    candidate = gen.generate(BRIEF, REFS)
+    candidate = gen.generate(BRIEF, REFS, ASPECT)
     assert (candidate.data, candidate.model) == (PNG, PRIMARY_MODEL)
     assert budget.remaining == 4
 
@@ -75,7 +76,7 @@ def test_retry_then_fallback():
         return httpx.Response(500) if body["model"] == PRIMARY_MODEL else ok(PNG)
 
     gen, seen = generator(respond, budget)
-    assert gen.generate(BRIEF, REFS).model == FALLBACK_MODEL
+    assert gen.generate(BRIEF, REFS, ASPECT).model == FALLBACK_MODEL
     assert budget.remaining == 2
     assert len(seen) == 3
 
@@ -84,7 +85,7 @@ def test_retry_then_fallback():
 def test_jpeg_and_webp_accepted(fmt: str):
     data = make_image(64, 48, fmt)
     gen, seen = generator(lambda body: ok(data), Budget(5))
-    assert gen.generate(BRIEF, REFS).data == data
+    assert gen.generate(BRIEF, REFS, ASPECT).data == data
     assert len(seen) == 1
 
 
@@ -95,7 +96,7 @@ def test_svg_or_garbage_counts_as_failure():
         return next(primary) if body["model"] == PRIMARY_MODEL else ok(PNG)
 
     gen, _ = generator(respond, Budget(5))
-    assert gen.generate(BRIEF, REFS).model == FALLBACK_MODEL
+    assert gen.generate(BRIEF, REFS, ASPECT).model == FALLBACK_MODEL
 
 
 def test_empty_data_counts_as_failure():
@@ -105,21 +106,21 @@ def test_empty_data_counts_as_failure():
         return ok(PNG)
 
     gen, _ = generator(respond, Budget(5))
-    assert gen.generate(BRIEF, REFS).model == FALLBACK_MODEL
+    assert gen.generate(BRIEF, REFS, ASPECT).model == FALLBACK_MODEL
 
 
 def test_all_fail_raises_round_failed():
     budget = Budget(10)
     gen, _ = generator(lambda body: httpx.Response(502), budget)
     with pytest.raises(RoundFailed):
-        gen.generate(BRIEF, REFS)
+        gen.generate(BRIEF, REFS, ASPECT)
     assert budget.remaining == 6
 
 
 def test_budget_exceeded_propagates():
     gen, seen = generator(lambda body: ok(PNG), Budget(0))
     with pytest.raises(BudgetExceeded):
-        gen.generate(BRIEF, REFS)
+        gen.generate(BRIEF, REFS, ASPECT)
     assert seen == []
 
 
@@ -128,7 +129,7 @@ def test_account_errors_stop_the_run(status: int):
     budget = Budget(5)
     gen, seen = generator(lambda body: httpx.Response(status, text="no credits"), budget)
     with pytest.raises(ForgerUnavailable, match=str(status)):
-        gen.generate(BRIEF, REFS)
+        gen.generate(BRIEF, REFS, ASPECT)
     assert len(seen) == 1
     assert budget.remaining == 4
 
@@ -137,7 +138,7 @@ def test_failure_reason_is_logged_without_the_key(caplog: pytest.LogCaptureFixtu
     responses = iter([httpx.Response(500, text="upstream exploded"), ok(PNG)])
     gen, _ = generator(lambda body: next(responses), Budget(5))
     with caplog.at_level(logging.WARNING):
-        gen.generate(BRIEF, REFS)
+        gen.generate(BRIEF, REFS, ASPECT)
     assert "500" in caplog.text
     assert "upstream exploded" in caplog.text
     assert "sk-test" not in caplog.text
@@ -146,7 +147,7 @@ def test_failure_reason_is_logged_without_the_key(caplog: pytest.LogCaptureFixtu
 def test_null_payload_is_a_failed_attempt():
     responses = iter([httpx.Response(200, json={"data": [{"b64_json": None}]}), ok(PNG)])
     gen, seen = generator(lambda body: next(responses), Budget(5))
-    assert gen.generate(BRIEF, REFS).data == PNG
+    assert gen.generate(BRIEF, REFS, ASPECT).data == PNG
     assert len(seen) == 2
 
 
@@ -158,5 +159,5 @@ def test_cost_is_logged(caplog: pytest.LogCaptureFixture):
 
     gen, _ = generator(costed, Budget(5))
     with caplog.at_level(logging.INFO):
-        gen.generate(BRIEF, REFS)
+        gen.generate(BRIEF, REFS, ASPECT)
     assert "0.0042" in caplog.text

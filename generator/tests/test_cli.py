@@ -12,7 +12,7 @@ from spot_the_forgery import cli
 from spot_the_forgery.budget import Budget
 from spot_the_forgery.cli import HttpxFetcher, main, run_generate
 from spot_the_forgery.forger import ForgerUnavailable
-from spot_the_forgery.models import Brief, Candidate
+from spot_the_forgery.models import AspectRatio, Brief, Candidate
 from spot_the_forgery.publish import load_index
 
 GROUPS = [group(n) for n in range(25)]
@@ -78,7 +78,9 @@ def test_day_failed_returns_1(tmp_path: Path):
 
 
 class UnavailableForger:
-    def generate(self, brief: Brief, reference_images: Sequence[bytes]) -> Candidate:
+    def generate(
+        self, brief: Brief, reference_images: Sequence[bytes], aspect_ratio: AspectRatio
+    ) -> Candidate:
         raise ForgerUnavailable("HTTP 402: no credits")
 
 

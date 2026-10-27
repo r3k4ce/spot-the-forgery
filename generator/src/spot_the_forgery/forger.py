@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 
 from spot_the_forgery.budget import Budget
-from spot_the_forgery.models import Brief, Candidate, RoundFailed
+from spot_the_forgery.models import AspectRatio, Brief, Candidate, RoundFailed
 from spot_the_forgery.normalize import sniff_media_type
 
 IMAGES_URL = "https://openrouter.ai/api/v1/images"
@@ -51,7 +51,9 @@ class OpenRouterImageGenerator:
         self._budget = budget
         self._models = tuple(models)
 
-    def generate(self, brief: Brief, reference_images: Sequence[bytes]) -> Candidate:
+    def generate(
+        self, brief: Brief, reference_images: Sequence[bytes], aspect_ratio: AspectRatio
+    ) -> Candidate:
         references = [
             {"type": "image_url", "image_url": {"url": _data_url(data)}}
             for data in reference_images
@@ -60,7 +62,7 @@ class OpenRouterImageGenerator:
             body: dict[str, Any] = {
                 "model": model,
                 "prompt": _prompt(brief),
-                "aspect_ratio": brief.aspect_ratio,
+                "aspect_ratio": aspect_ratio,
                 "resolution": "1K",
                 "n": 1,
                 "input_references": references,

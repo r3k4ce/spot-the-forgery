@@ -8,15 +8,7 @@ import anthropic
 import pydantic
 from anthropic.types import ImageBlockParam, TextBlockParam
 
-from spot_the_forgery.models import (
-    SUPPORTED_ASPECTS,
-    AspectRatio,
-    Brief,
-    Candidate,
-    Pick,
-    RoundFailed,
-    Verdict,
-)
+from spot_the_forgery.models import Brief, Candidate, Pick, RoundFailed, Verdict
 from spot_the_forgery.normalize import sniff_media_type
 
 DEFAULT_MODEL = "claude-haiku-5-5"
@@ -34,8 +26,7 @@ brushwork, support (canvas, panel, silk, paper) and the condition of an old work
 varnish, craquelure, fading). Write the description as a detailed image-generation prompt, \
 written as a description of the physical painting, not as a photo of a gallery.
 
-Choose the aspect ratio, from the allowed values, that is closest to typical works by this \
-group. List anachronisms or giveaways the forger must avoid."""
+List anachronisms or giveaways the forger must avoid."""
 
 JUDGE_SYSTEM = """You judge forgeries for a guessing game. The paintings labelled \
 "Real painting" are genuine works from one group (one artist, or one culture and period). The \
@@ -52,7 +43,6 @@ candidate's number as its index."""
 
 class BriefOut(pydantic.BaseModel):
     prompt: str
-    aspect_ratio: AspectRatio
     forbidden: list[str]
 
 
@@ -110,11 +100,8 @@ class ClaudeBriefWriter:
         content: Content = [_text(f"Genuine paintings by {who} {group.label}:")]
         for painting, data in zip(pick.references, reference_images, strict=True):
             content += [_text(f"{painting.title} ({painting.date})"), _image(data)]
-        content.append(_text(f"Allowed aspect ratios: {', '.join(SUPPORTED_ASPECTS)}."))
         out = _parse(self._client, self._model, BRIEF_SYSTEM, content, BriefOut)
-        return Brief(
-            prompt=out.prompt, aspect_ratio=out.aspect_ratio, forbidden=tuple(out.forbidden)
-        )
+        return Brief(prompt=out.prompt, forbidden=tuple(out.forbidden))
 
 
 class ClaudeJudge:

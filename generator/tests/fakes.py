@@ -8,6 +8,7 @@ from imaging import make_image, open_image
 
 from spot_the_forgery.budget import Budget
 from spot_the_forgery.models import (
+    AspectRatio,
     Brief,
     Candidate,
     Group,
@@ -51,7 +52,7 @@ class FakeBriefWriter:
         self.calls += 1
         if pick.group.key in self.fail_groups:
             raise RoundFailed("refused")
-        return Brief(prompt="p", aspect_ratio="4:3", forbidden=())
+        return Brief(prompt="p", forbidden=())
 
 
 @dataclass
@@ -63,12 +64,16 @@ class FakeForger:
     size: tuple[int, int] | None = None
     calls: int = 0
     briefs: list[Brief] = field(default_factory=list)
+    aspects: list[str] = field(default_factory=list)
 
-    def generate(self, brief: Brief, reference_images: Sequence[bytes]) -> Candidate:
+    def generate(
+        self, brief: Brief, reference_images: Sequence[bytes], aspect_ratio: AspectRatio
+    ) -> Candidate:
         if self.budget is not None:
             self.budget.spend()
         self.calls += 1
         self.briefs.append(brief)
+        self.aspects.append(aspect_ratio)
         if self.calls in self.fail_calls:
             raise RoundFailed("image failed")
         width, height = self.size or (10 + self.calls, 10)

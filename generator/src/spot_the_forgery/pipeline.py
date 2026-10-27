@@ -97,12 +97,11 @@ def _fetch_references(pick: Pick, fetcher: ImageFetcher) -> list[bytes]:
 def _candidates(
     deps: Deps, pick: Pick, references: Sequence[bytes], aspect: AspectRatio
 ) -> list[Candidate]:
-    # The brief's own aspect ratio is replaced: the fake must match a shown painting.
-    brief = dataclasses.replace(deps.brief_writer.write(pick, references), aspect_ratio=aspect)
+    brief = deps.brief_writer.write(pick, references)
     candidates: list[Candidate] = []
     for _ in range(CANDIDATES_PER_ROUND):
         try:
-            candidates.append(deps.forger.generate(brief, references))
+            candidates.append(deps.forger.generate(brief, references, aspect))
         except RoundFailed as exc:
             log.warning("candidate failed for %s: %s", pick.group.key, exc)
     if not candidates:

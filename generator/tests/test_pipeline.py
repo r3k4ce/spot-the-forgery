@@ -164,5 +164,5 @@ def test_fake_takes_the_shape_of_a_shown_painting():
     fetcher = FakeFetcher(sizes={g.paintings[0].image_url: (500, 300)})
     forger = FakeForger(size=(300, 300))
     built = build_round(pick_of(g), deps(FakeJudge(scripted([5, 5, 5])), forger, fetcher=fetcher))
-    assert {b.aspect_ratio for b in forger.briefs} == {"16:9"}
+    assert forger.aspects == ["16:9"] * 3
     assert open_image(built.fake.data).size == (300, 180)

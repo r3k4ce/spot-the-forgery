@@ -56,12 +56,10 @@ REFS = [make_image(30, 20, "JPEG"), make_image(30, 20, "PNG")]
 
 
 def test_brief_parses_and_sends_images():
-    reply = {"prompt": "A river at dusk...", "aspect_ratio": "3:2", "forbidden": ["electric light"]}
+    reply = {"prompt": "A river at dusk...", "forbidden": ["electric light"]}
     client, seen = client_for(lambda body: message(reply))
     brief = ClaudeBriefWriter(client).write(PICK, REFS)
-    assert brief == Brief(
-        prompt="A river at dusk...", aspect_ratio="3:2", forbidden=("electric light",)
-    )
+    assert brief == Brief(prompt="A river at dusk...", forbidden=("electric light",))
     body = seen[0]
     assert body["model"] == "claude-haiku-5-5"
     images = [b for b in blocks(body) if b["type"] == "image"]
@@ -76,11 +74,14 @@ def test_brief_refusal_raises():
         ClaudeBriefWriter(client).write(PICK, REFS)
 
 
-def test_brief_with_unsupported_aspect_raises_round_failed():
-    reply = {"prompt": "x", "aspect_ratio": "7:5", "forbidden": []}
-    client, _ = client_for(lambda body: message(reply))
-    with pytest.raises(RoundFailed):
-        ClaudeBriefWriter(client).write(PICK, REFS)
+def test_brief_does_not_ask_for_an_aspect_ratio():
+    """The fake always takes a shown painting's shape, so Claude's choice would be thrown away."""
+    client, seen = client_for(lambda body: message({"prompt": "x", "forbidden": []}))
+    ClaudeBriefWriter(client).write(PICK, REFS)
+    body = seen[0]
+    assert "aspect" not in json.dumps(body["output_config"]).lower()
+    assert "aspect" not in body["system"].lower()
+    assert "aspect" not in all_text(body).lower()
 
 
 def test_api_errors_propagate():

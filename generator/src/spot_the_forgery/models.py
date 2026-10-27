@@ -39,7 +39,6 @@ class Pick:
 @dataclass(frozen=True)
 class Brief:
     prompt: str
-    aspect_ratio: AspectRatio
     forbidden: tuple[str, ...]
 
 
@@ -82,7 +81,9 @@ class BriefWriter(Protocol):
 
 
 class ImageGenerator(Protocol):
-    def generate(self, brief: Brief, reference_images: Sequence[bytes]) -> Candidate: ...
+    def generate(
+        self, brief: Brief, reference_images: Sequence[bytes], aspect_ratio: AspectRatio
+    ) -> Candidate: ...
 
 
 class Judge(Protocol):
