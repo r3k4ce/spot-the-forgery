@@ -1,0 +1,76 @@
+name: Daily puzzles
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      max_images:
+        description: Image budget for this run
+        required: false
+        default: "30"
+
+permissions:
+  contents: write
+
+# A manual run and the cron run must never generate the same dates at once.
+concurrency:
+  group: daily-generate
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    outputs:
+      pushed: ${{ steps.commit.outputs.pushed }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: generator/uv.lock
+
+      - name: Generate puzzles
+        id: generate
+        working-directory: generator
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MAX_IMAGES: ${{ inputs.max_images || 30 }}
+        run: uv run --locked stf generate --max-images "$MAX_IMAGES"
+
+      # Days finished before a failure are still worth publishing.
+      - name: Commit new puzzles
+        id: commit
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Nothing new to commit."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          index=frontend/public/puzzles/index.json
+          dates=$(jq -r --argjson old "$(git show "HEAD:$index")" '. - $old | join(", ")' "$index")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: puzzles for ${dates:-catalog refresh}"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Report generator failure
+        if: steps.generate.outcome == 'failure'
+        run: |
+          echo "::error::stf generate failed; see the Generate puzzles step."
+          exit 1
+
+  # Pushes made with GITHUB_TOKEN don't trigger other workflows, so deploy explicitly.
+  deploy:
+    needs: generate
+    if: ${{ !cancelled() && needs.generate.outputs.pushed == 'true' }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
