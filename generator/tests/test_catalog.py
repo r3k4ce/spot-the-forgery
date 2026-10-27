@@ -164,10 +164,16 @@ def test_refresh_fetches_and_saves_when_stale(tmp_path):
     [
         httpx.Response(200, text="<html>Down for maintenance</html>"),
         httpx.Response(200, json={"unexpected": True}),
+        # An outage that answers "no paintings" must not wipe the cached catalog.
+        httpx.Response(200, json={"info": {"total": 0}, "data": []}),
     ],
 )
-def test_refresh_falls_back_on_garbled_response(tmp_path, response: httpx.Response):
+def test_refresh_keeps_stale_cache_on_garbled_or_empty_response(
+    tmp_path, response: httpx.Response
+):
     path = tmp_path / "catalog.json"
-    save_catalog(_groups(), path, NOW - timedelta(days=8))
+    stale = NOW - timedelta(days=8)
+    save_catalog(_groups(), path, stale)
     client = httpx.Client(transport=httpx.MockTransport(lambda request: response))
     assert refresh_if_stale(path, client, NOW) == _groups()
+    assert load_catalog(path) == (_groups(), stale)

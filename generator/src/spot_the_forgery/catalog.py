@@ -131,6 +131,14 @@ def load_catalog(path: Path) -> tuple[list[Group], datetime]:
     return groups, datetime.fromisoformat(data["fetchedAt"])
 
 
+def _download_groups(client: httpx.Client) -> list[Group]:
+    groups = build_groups(fetch_records(client))
+    if not groups:
+        # The museum has not stopped lending paintings: an empty answer is an outage.
+        raise ValueError("the museum API returned no usable paintings")
+    return groups
+
+
 def refresh_if_stale(
     path: Path, client: httpx.Client, now: datetime, max_age: timedelta = timedelta(days=7)
 ) -> list[Group]:
@@ -138,7 +146,7 @@ def refresh_if_stale(
     if cached is not None and now - cached[1] < max_age:
         return cached[0]
     try:
-        groups = build_groups(fetch_records(client))
+        groups = _download_groups(client)
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         if cached is None:
             raise
