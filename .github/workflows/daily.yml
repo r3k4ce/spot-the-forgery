@@ -1,8 +1,7 @@
 name: Daily puzzles
 
+# Manual only: every run spends OpenRouter credits. Add a schedule trigger to run it daily.
 on:
-  schedule:
-    - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
       max_images:
@@ -13,7 +12,7 @@ on:
 permissions:
   contents: write
 
-# A manual run and the cron run must never generate the same dates at once.
+# Two runs must never generate the same dates at once.
 concurrency:
   group: daily-generate
   cancel-in-progress: false

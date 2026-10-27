@@ -16,8 +16,9 @@ and one is an AI forgery made in the same style. Rounds get harder as the day go
   lightly obfuscated, not encrypted.
 - `frontend/` is a static Vite + React site that reads those files. Puzzles change at
   midnight UTC.
-- GitHub Actions builds puzzles for today through today + 3 every day at 03:00 UTC, commits
-  them and redeploys GitHub Pages.
+- GitHub Actions builds puzzles for today through today + 3 when you run the Daily puzzles
+  workflow by hand, commits them and redeploys GitHub Pages. On a date with no puzzle of its
+  own, the site shows the most recent one.
 
 ## Local setup
 
@@ -54,11 +55,13 @@ the budget ran out on today's date, `2` missing API keys.
 1. Add two repository secrets under **Settings → Secrets and variables → Actions**:
    `ANTHROPIC_API_KEY` and `OPENROUTER_API_KEY`.
 2. Under **Settings → Pages**, set **Source** to **GitHub Actions**.
-3. Push to `main`. `pages.yml` deploys the site; `daily.yml` runs every day at 03:00 UTC, or
-   from the Actions tab with an optional image budget.
+3. Push to `main`. `pages.yml` deploys the site. `daily.yml` runs only when you start it from
+   the Actions tab (**Daily puzzles → Run workflow**, with an optional image budget). To make
+   it run every day, add `schedule: [{cron: "0 3 * * *"}]` under its `on:` key.
 
-Expected running cost is about $4 a month on OpenRouter: 15 FLUX 3 Klein images a day at
-$0.009 each, and at most $0.27 on a day that hits the 30-image cap. The Claude calls run on
+Each run costs at most $0.27 on OpenRouter (the default 30-image cap). One date takes 15
+FLUX 3 Klein images at $0.009 each, about $0.14; a daily schedule would come to about $4 a
+month. The Claude calls run on
 the Anthropic API key and aren't counted here. Measured on the first live dry run
 (2026-10-27): 15 images, all from FLUX 3 Klein, $0.135 in total.
 
