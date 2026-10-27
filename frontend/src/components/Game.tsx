@@ -14,6 +14,7 @@ interface Props {
   answers: SealedPayload;
   // Every playable date, oldest first; the last one is the latest puzzle.
   dates: string[];
+  isLatest: boolean;
   // Guesses made this visit, by date; they win over storage, which may not have kept them.
   played: Map<string, number[]>;
   // Painting positions per round for a replay; the original order otherwise.
@@ -30,7 +31,7 @@ function shareUrl(date: string, isLatest: boolean): string {
 
 // One puzzle being played. App gives each puzzle its own Game (keyed by date), so the guesses
 // here always belong to this puzzle, whatever loads or reloads around it.
-export function Game({ puzzle, answers, dates, played, orders, onReplay }: Props) {
+export function Game({ puzzle, answers, dates, isLatest, played, orders, onReplay }: Props) {
   const { date, rounds } = puzzle;
   const total = rounds.length;
   const [guesses, setGuesses] = useState(() =>
@@ -38,7 +39,6 @@ export function Game({ puzzle, answers, dates, played, orders, onReplay }: Props
   );
   // Whether the latest guess's answer is on screen.
   const [revealing, setRevealing] = useState(false);
-  const isLatest = date === dates.at(-1);
   const results = checkGuesses(guesses, answers);
   const src = (file: string) => imageUrl(date, file);
 

@@ -116,6 +116,7 @@ export default function App() {
               puzzle={load.puzzle}
               answers={load.answers}
               dates={load.dates}
+              isLatest={isLatest}
               played={played}
               orders={shuffle?.date === load.puzzle.date ? shuffle.orders : undefined}
               onReplay={() => {

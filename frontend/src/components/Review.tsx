@@ -3,6 +3,8 @@ import type { PuzzleRound, RoundReveal } from "../lib/types";
 interface Props {
   rounds: PuzzleRound[];
   answers: RoundReveal[];
+  // Whether each round was spotted, as the score counts it.
+  results: boolean[];
   guesses: number[];
   imageUrl: (file: string) => string;
 }
@@ -12,7 +14,7 @@ function describe(round: number, painting: number, isFake: boolean, isGuess: boo
   return `Round ${round}, painting ${painting}${notes ? `: ${notes}` : ""}`;
 }
 
-export function Review({ rounds, answers, guesses, imageUrl }: Props) {
+export function Review({ rounds, answers, results, guesses, imageUrl }: Props) {
   return (
     <section aria-labelledby="review-title" className="mt-10 text-left">
       <h3 id="review-title" className="mb-3 text-center font-serif text-xl">
@@ -22,7 +24,7 @@ export function Review({ rounds, answers, guesses, imageUrl }: Props) {
         {rounds.map((round, r) => {
           const answer = answers[r];
           if (!answer) return null;
-          const spotted = guesses[r] === answer.fakeIndex;
+          const spotted = results[r];
           return (
             <details key={round.groupKey} className="rounded border border-stone-800 bg-stone-900/50">
               <summary className="cursor-pointer px-4 py-3 focus-visible:outline-2 focus-visible:outline-amber-400">

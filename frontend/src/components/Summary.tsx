@@ -125,6 +125,7 @@ export function Summary({
       <Review
         rounds={puzzle.rounds}
         answers={answers.rounds}
+        results={results}
         guesses={guesses}
         imageUrl={imageUrl}
       />
