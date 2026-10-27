@@ -304,6 +304,19 @@ describe("the zoomed view", () => {
     expect(dialog).toHaveAccessibleName("Painting 1 of 4");
   });
 
+  it("only looks after the answer is shown", async () => {
+    const { user } = await start();
+    await guess(user, 3);
+    await user.click(painting(1));
+    await user.keyboard("{ArrowRight}");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAccessibleName("Painting 2 of 4");
+    expect(within(dialog).queryByRole("button", { name: "This one is the fake" })).toBeNull();
+    await user.keyboard("{Escape}");
+    expect(within(screen.getAllByRole("figure")[2]).getByText("Your guess")).toBeInTheDocument();
+    expect(liveRegion()).toHaveTextContent("Correct");
+  });
+
   it("can guess from the zoomed view", async () => {
     const { user } = await start();
     await user.click(painting(3));
