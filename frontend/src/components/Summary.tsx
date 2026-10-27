@@ -6,6 +6,8 @@ import { Review } from "./Review";
 interface Props {
   puzzle: Puzzle;
   results: boolean[];
+  // The first finish, which is the one that counts; undefined if it was recorded without rounds.
+  firstResults: boolean[] | undefined;
   streaks: Streaks;
   shareUrl: string;
   answers: SealedPayload;
@@ -47,6 +49,7 @@ function copyWithSelection(text: string): boolean {
 export function Summary({
   puzzle,
   results,
+  firstResults,
   streaks,
   shareUrl,
   answers,
@@ -56,7 +59,10 @@ export function Summary({
   onReplay,
 }: Props) {
   const [status, setStatus] = useState("");
-  const text = shareText(puzzle.number, results, shareUrl);
+  // A replay can't share a better score than the first finish.
+  const shared = firstResults ?? results;
+  const isReplay = shared.some((ok, i) => ok !== results[i]);
+  const text = shareText(puzzle.number, shared, shareUrl);
   const canShare = typeof navigator.share === "function";
 
   async function copy() {
@@ -102,6 +108,11 @@ export function Summary({
       >
         {text}
       </pre>
+      {isReplay && (
+        <p className="mt-4 text-sm text-stone-400">
+          {`Replays don't count: sharing your first score, ${score(shared)}/${shared.length}.`}
+        </p>
+      )}
       <div className="mt-4 flex justify-center gap-3">
         <button
           type="button"

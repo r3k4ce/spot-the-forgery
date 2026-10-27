@@ -54,7 +54,8 @@ export function Game({ puzzle, answers, dates, isLatest, played, orders, onRepla
     setRevealing(true);
     // A replay doesn't change the score that counts: only the first finish is kept.
     if (next.length === total && !(date in loadHistory())) {
-      recordResult(date, { score: score(checkGuesses(next, answers)), total });
+      const finished = checkGuesses(next, answers);
+      recordResult(date, { score: score(finished), total, results: finished });
     }
   }
 
@@ -65,11 +66,13 @@ export function Game({ puzzle, answers, dates, isLatest, played, orders, onRepla
   }
 
   if (guesses.length >= total && !revealing) {
+    const history = loadHistory();
     return (
       <Summary
         puzzle={puzzle}
         results={results}
-        streaks={computeStreaks(loadHistory(), dates)}
+        firstResults={history[date]?.results}
+        streaks={computeStreaks(history, dates)}
         shareUrl={shareUrl(date, isLatest)}
         answers={answers}
         guesses={guesses}

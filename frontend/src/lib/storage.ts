@@ -30,6 +30,12 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 const isDayResult = (v: unknown): v is DayResult =>
   isRecord(v) && Number.isInteger(v.score) && Number.isInteger(v.total);
 
+// Malformed rounds lose only themselves; the score still counts for the streak and archive.
+function cleanResult({ score, total, results }: DayResult): DayResult {
+  const valid = Array.isArray(results) && results.every((r) => typeof r === "boolean");
+  return valid ? { score, total, results } : { score, total };
+}
+
 const isGuessList = (v: unknown): v is number[] =>
   Array.isArray(v) && v.every((g) => Number.isInteger(g));
 
@@ -49,7 +55,8 @@ export type History = Record<string, DayResult>;
 export function loadHistory(): History {
   const stored = read(HISTORY_KEY);
   if (!isRecord(stored)) return {};
-  return Object.fromEntries(Object.entries(stored).filter(([, r]) => isDayResult(r))) as History;
+  const valid = Object.entries(stored).filter((e): e is [string, DayResult] => isDayResult(e[1]));
+  return Object.fromEntries(valid.map(([date, r]) => [date, cleanResult(r)]));
 }
 
 export function recordResult(date: string, r: DayResult): void {

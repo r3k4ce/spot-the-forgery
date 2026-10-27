@@ -411,7 +411,7 @@ describe("the results screen", () => {
     expect(writeText).toHaveBeenCalledWith(expected);
     expect(await screen.findByText("Copied!")).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("stf:history")!)).toEqual({
-      "2026-10-26": { score: 1, total: 2 },
+      "2026-10-26": { score: 1, total: 2, results: [true, false] },
     });
   });
 
@@ -540,8 +540,41 @@ describe("playing again", () => {
     await seeResults(user);
     expect(screen.getByText("2/2")).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("stf:history")!)).toEqual({
-      "2026-10-26": { score: 1, total: 2 },
+      "2026-10-26": { score: 1, total: 2, results: [true, false] },
     });
+  });
+
+  it("shares the first finish, not a better replay", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const { user } = await start();
+    stubClipboard(writeText);
+    await finish(user, 3, 2);
+    expect(screen.queryByText(/Replays don't count/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Play again" }));
+    await guessFile(user, "a3.jpg");
+    await nextRound(user);
+    await guessFile(user, "b1.jpg");
+    await seeResults(user);
+
+    // The replay's own score stays on screen; only what gets shared is the first one.
+    expect(screen.getByText("2/2")).toBeInTheDocument();
+    const expected = `Spot the Forgery #7 🖼️\n🟩🟥 1/2\n${location.href.split("#")[0]}`;
+    expect(screen.getByTestId("share-text")).toHaveTextContent(expected.replace(/\n/g, " "));
+    const note = "Replays don't count: sharing your first score, 1/2.";
+    expect(screen.getByText(note)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Copy result" }));
+    expect(writeText).toHaveBeenCalledWith(expected);
+  });
+
+  it("shares the play on screen for a result recorded without its rounds", async () => {
+    // Results recorded before rounds were kept only have the score.
+    localStorage.setItem("stf:history", JSON.stringify({ "2026-10-26": { score: 1, total: 2 } }));
+    const progress = { date: "2026-10-26", guesses: [2, 0] };
+    localStorage.setItem("stf:progress:2026-10-26", JSON.stringify(progress));
+    render(<App />);
+    expect(await screen.findByTestId("share-text")).toHaveTextContent("🟩🟩 2/2");
+    expect(screen.queryByText(/Replays don't count/)).not.toBeInTheDocument();
   });
 
   it("shuffles the paintings", async () => {
