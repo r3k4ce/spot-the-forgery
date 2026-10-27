@@ -597,6 +597,15 @@ it("explains the game on the first visit only, and reopens from the ? button", a
   expect(screen.getByRole("button", { name: "How to play" })).toHaveFocus();
 });
 
+it("closes the help from outside its panel, but not from inside it", async () => {
+  const { user } = await start();
+  await user.click(screen.getByRole("button", { name: "How to play" }));
+  await user.click(screen.getByRole("heading", { name: "How to play" }));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  await user.click(screen.getByRole("dialog"));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
 it("keeps keyboard focus inside the help", async () => {
   const { user } = await start();
   await user.click(screen.getByRole("button", { name: "How to play" }));
