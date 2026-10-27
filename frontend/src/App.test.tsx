@@ -82,6 +82,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -390,6 +391,27 @@ describe("the results screen", () => {
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Share" }));
     expect(share).toHaveBeenCalledWith({ text: expect.stringContaining("🟩🟩 2/2") });
+  });
+
+  it("counts down to the next puzzle, for the latest puzzle only", async () => {
+    // Only the clock and intervals are faked, so Testing Library's own waiting still works.
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date("2026-11-02T03:58:30Z"));
+    for (const date of DATES) {
+      localStorage.setItem(`stf:progress:${date}`, JSON.stringify({ date, guesses: [2, 0] }));
+    }
+    render(<App />);
+    expect(await screen.findByText("Next puzzle in 1 minute")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(screen.getByText("Next puzzle in less than a minute")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(screen.getByText("The next puzzle is on its way.")).toBeInTheDocument();
+
+    window.location.hash = "#/2026-10-19";
+    await screen.findByRole("heading", { level: 1, name: "Spot the Forgery #1" });
+    expect(screen.getByText("Your result")).toBeInTheDocument();
+    expect(screen.queryByText(/next puzzle/i)).not.toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("counts the streak across weekly puzzles", async () => {

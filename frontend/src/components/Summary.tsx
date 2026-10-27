@@ -16,13 +16,14 @@ interface Props {
   onReplay: () => void;
 }
 
-function useNow(intervalMs: number): number {
+// Its own component so the clock only ticks, once a minute, while a countdown is on screen.
+function Countdown({ to }: { to: Date }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
-  }, [intervalMs]);
-  return now;
+  }, []);
+  return <p className="mt-6 text-stone-400">{formatCountdown(to.getTime() - now)}</p>;
 }
 
 // Where the async clipboard is blocked (no secure context, a denied permission, some embedded
@@ -55,7 +56,6 @@ export function Summary({
   onReplay,
 }: Props) {
   const [status, setStatus] = useState("");
-  const now = useNow(60_000);
   const text = shareText(puzzle.number, results, shareUrl);
   const canShare = typeof navigator.share === "function";
 
@@ -121,9 +121,7 @@ export function Summary({
       <p aria-live="polite" className="mt-2 h-6 text-sm text-stone-300">
         {status}
       </p>
-      {nextPuzzle && (
-        <p className="mt-6 text-stone-400">{formatCountdown(nextPuzzle.getTime() - now)}</p>
-      )}
+      {nextPuzzle && <Countdown to={nextPuzzle} />}
       <Review
         rounds={puzzle.rounds}
         answers={answers.rounds}
