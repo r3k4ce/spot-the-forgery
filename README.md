@@ -58,7 +58,8 @@ could not be built, `2` missing API keys.
 
 Expected running cost is about $4 a month on OpenRouter: 15 FLUX 3 Klein images a day at
 $0.009 each, and at most $0.27 on a day that hits the 30-image cap. The Claude calls run on
-the Anthropic API key and aren't counted here.
+the Anthropic API key and aren't counted here. Measured on the first live dry run
+(2026-10-27): 15 images, all from FLUX 3 Klein, $0.135 in total.
 
 ## Credits
 
