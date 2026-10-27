@@ -80,9 +80,7 @@ def _fetch_shown(pick: Pick, fetcher: ImageFetcher) -> tuple[Pick, tuple[bytes, 
             data = _fetch(fetcher, painting)
         shown.append(painting)
         images.append(data)
-    swapped = Pick(
-        group=pick.group, shown=tuple(shown), references=pick.references, spares=tuple(spares)
-    )
+    swapped = dataclasses.replace(pick, shown=tuple(shown), spares=tuple(spares))
     return swapped, tuple(images)
 
 
