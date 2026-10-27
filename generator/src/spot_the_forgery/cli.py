@@ -1,4 +1,4 @@
-"""`stf` command: build upcoming daily puzzles into the static site."""
+"""`stf` command: build upcoming puzzles into the static site."""
 
 import argparse
 import logging
@@ -17,7 +17,7 @@ from spot_the_forgery.claude import DEFAULT_MODEL, ClaudeBriefWriter, ClaudeJudg
 from spot_the_forgery.forger import ForgerUnavailable, OpenRouterImageGenerator
 from spot_the_forgery.models import Group
 from spot_the_forgery.picker import day_rng
-from spot_the_forgery.pipeline import DayFailed, Deps, build_day
+from spot_the_forgery.pipeline import MIN_IMAGES_PER_DAY, DayFailed, Deps, build_day
 from spot_the_forgery.publish import load_history, load_index, publish_day, puzzle_dir
 
 REQUIRED_ENV = ("ANTHROPIC_API_KEY", "OPENROUTER_API_KEY")
@@ -41,7 +41,7 @@ def run_generate(
     groups: Sequence[Group],
     deps: Deps,
     budget: Budget,
-    days_ahead: int = 3,
+    days_ahead: int,
 ) -> int:
     published = set(load_index(puzzles_dir))
     for offset in range(days_ahead + 1):
@@ -52,7 +52,7 @@ def run_generate(
             # publish_day would refuse it, so building it would only waste paid images.
             log.error("%s has a puzzle folder but is not in the index", day)
             return 1
-        if not budget.can_start_day():
+        if budget.remaining < MIN_IMAGES_PER_DAY:
             log.info("budget too low to start %s (%d left); stopping", day, budget.remaining)
             return 0
         try:
