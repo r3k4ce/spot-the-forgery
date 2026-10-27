@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { loadPuzzle } from "./lib/load";
@@ -210,6 +210,32 @@ it("restores progress after a reload", async () => {
   unmount();
   await start();
   expect(screen.getByRole("heading", { name: ROUND_2 })).toBeInTheDocument();
+});
+
+it("keeps a guess made while the puzzle reloads, even when storage is full", async () => {
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new DOMException("full", "QuotaExceededError");
+  });
+  const { user } = await start();
+  // From here on, loads wait until the test lets them finish.
+  const pending: (() => void)[] = [];
+  const respond = vi.mocked(loadPuzzle).getMockImplementation()!;
+  vi.mocked(loadPuzzle).mockImplementation(async (date) => {
+    await new Promise<void>((resolve) => pending.push(resolve));
+    return respond(date);
+  });
+
+  // Off to an old puzzle and straight back: the latest puzzle shows again while it reloads.
+  window.location.hash = "#/2026-10-19";
+  expect(await screen.findByText("Loading…")).toBeInTheDocument();
+  window.location.hash = "#/";
+  expect(await screen.findByRole("heading", { name: ROUND_1 })).toBeInTheDocument();
+  await guess(user, 3);
+  await act(async () => {
+    pending.forEach((resolve) => resolve());
+    await new Promise((settle) => setTimeout(settle, 0));
+  });
+  expect(liveRegion()).toHaveTextContent("Correct");
 });
 
 it("works from the keyboard", async () => {
@@ -427,6 +453,19 @@ describe("the archive", () => {
 
     await user.click(screen.getByRole("link", { name: "Back to the latest puzzle" }));
     expect(await title("Spot the Forgery #7")).toBeInTheDocument();
+  });
+
+  it("keeps each puzzle's progress to itself", async () => {
+    const { user } = await start();
+    await guess(user, 3);
+    window.location.hash = "#/2026-10-19";
+    await screen.findByRole("heading", { level: 1, name: "Spot the Forgery #1" });
+    expect(screen.getByText("Round 1 of 2")).toBeInTheDocument();
+    expect(liveRegion()).toBeEmptyDOMElement();
+
+    window.location.hash = "#/";
+    await screen.findByRole("heading", { level: 1, name: "Spot the Forgery #7" });
+    expect(screen.getByRole("heading", { name: ROUND_2 })).toBeInTheDocument();
   });
 });
 

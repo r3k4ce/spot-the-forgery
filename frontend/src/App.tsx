@@ -2,18 +2,11 @@ import { useEffect, useState } from "react";
 import { Archive } from "./components/Archive";
 import { Game } from "./components/Game";
 import { Help } from "./components/Help";
-import { checkGuesses, score, shuffledOrder } from "./lib/game";
+import { shuffledOrder } from "./lib/game";
 import { loadPuzzle } from "./lib/load";
 import { ARCHIVE_HREF, LATEST_HREF, parseRoute } from "./lib/route";
 import { unseal } from "./lib/seal";
-import {
-  hasSeenHelp,
-  loadHistory,
-  loadProgress,
-  markHelpSeen,
-  recordResult,
-  saveProgress,
-} from "./lib/storage";
+import { hasSeenHelp, markHelpSeen } from "./lib/storage";
 import type { Puzzle, SealedPayload } from "./lib/types";
 
 // Each result remembers which date it was loaded for, so a stale one reads as loading.
@@ -27,9 +20,8 @@ type Load = { status: "loading" } | Loaded;
 export default function App() {
   const [route, setRoute] = useState(() => parseRoute(location.hash));
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [guesses, setGuesses] = useState<number[]>([]);
-  const [revealing, setRevealing] = useState(false);
-  // Painting positions for a replay, per round; only for the puzzle that was replayed.
+  // Painting positions for a replay, per round; only for the puzzle that was replayed. Kept
+  // here rather than in Game so a replay keeps its arrangement across a visit to the archive.
   const [shuffle, setShuffle] = useState<{ date: string; orders: number[][] } | null>(null);
   // First-time visitors get the rules before anything else.
   const [helpOpen, setHelpOpen] = useState(() => !hasSeenHelp());
@@ -39,7 +31,6 @@ export default function App() {
   useEffect(() => {
     const onHash = () => {
       setRoute(parseRoute(location.hash));
-      setRevealing(false);
       window.scrollTo(0, 0);
     };
     window.addEventListener("hashchange", onHash);
@@ -59,7 +50,6 @@ export default function App() {
         // Answers stay hidden in state until each round is guessed.
         const answers = await unseal(puzzle.sealed, puzzle.date);
         if (cancelled) return;
-        setGuesses(loadProgress(puzzle.date).slice(0, puzzle.rounds.length));
         setLoaded({ key, status: "ready", puzzle, dates, answers });
       } catch {
         if (!cancelled) setLoaded({ key, status: "error" });
@@ -117,32 +107,16 @@ export default function App() {
           )}
           {load.status === "ready" && route.view === "archive" && <Archive dates={load.dates} />}
           {showPuzzle && (
+            // A new key for each puzzle, so no play state carries over from another one.
             <Game
+              key={load.puzzle.date}
               puzzle={load.puzzle}
               answers={load.answers}
               dates={load.dates}
-              guesses={guesses}
-              revealing={revealing}
               orders={shuffle?.date === load.puzzle.date ? shuffle.orders : undefined}
-              onGuess={(index) => {
-                const { date, rounds } = load.puzzle;
-                const next = [...guesses, index];
-                saveProgress(date, next);
-                setGuesses(next);
-                setRevealing(true);
-                // A replay doesn't change the score that counts: only the first finish is kept.
-                if (next.length === rounds.length && !(date in loadHistory())) {
-                  const results = checkGuesses(next, load.answers);
-                  recordResult(date, { score: score(results), total: rounds.length });
-                }
-              }}
-              onNext={() => setRevealing(false)}
               onReplay={() => {
                 const { date, rounds } = load.puzzle;
                 setShuffle({ date, orders: rounds.map((r) => shuffledOrder(r.images.length)) });
-                saveProgress(date, []);
-                setGuesses([]);
-                setRevealing(false);
               }}
             />
           )}
