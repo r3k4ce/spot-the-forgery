@@ -146,12 +146,53 @@ it("shows the score and shares to the clipboard", async () => {
   expect(screen.getByText("1/2")).toBeInTheDocument();
   const expected = `Spot the Forgery #7 🖼️\n🟩🟥 1/2\n${location.href.split("#")[0]}`;
   expect(screen.getByTestId("share-text")).toHaveTextContent(expected.replace(/\n/g, " "));
-  await user.click(screen.getByRole("button", { name: "Share" }));
+  await user.click(screen.getByRole("button", { name: "Copy result" }));
   expect(writeText).toHaveBeenCalledWith(expected);
   expect(await screen.findByText("Copied!")).toBeInTheDocument();
   expect(JSON.parse(localStorage.getItem("stf:history")!)).toEqual({
     "2026-10-26": { score: 1, total: 2 },
   });
+});
+
+async function finish(user: ReturnType<typeof userEvent.setup>, first: number, second: number) {
+  await guess(user, first);
+  await user.click(screen.getByRole("button", { name: "Next round" }));
+  await guess(user, second);
+  await user.click(screen.getByRole("button", { name: "See results" }));
+}
+
+it("can play the puzzle again and keeps the first score", async () => {
+  const { user } = await start();
+  await finish(user, 3, 2);
+  expect(screen.getByText("1/2")).toBeInTheDocument();
+  expect(screen.getByText("A new puzzle arrives every Monday.")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Play again" }));
+  expect(
+    screen.getByRole("heading", { name: "Four paintings attributed to Thomas Eakins" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("AI forgery")).not.toBeInTheDocument();
+
+  await finish(user, 3, 1);
+  expect(screen.getByText("2/2")).toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem("stf:history")!)).toEqual({
+    "2026-10-26": { score: 1, total: 2 },
+  });
+});
+
+it("copies the result another way when the clipboard is blocked", async () => {
+  const writeText = vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError"));
+  const execCommand = vi.fn().mockReturnValue(true);
+  const { user } = await start();
+  // After start(): user-event installs its own clipboard during setup.
+  Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  Object.defineProperty(document, "execCommand", { value: execCommand, configurable: true });
+  await finish(user, 3, 1);
+
+  await user.click(screen.getByRole("button", { name: "Copy result" }));
+  expect(execCommand).toHaveBeenCalledWith("copy");
+  expect(await screen.findByText("Copied!")).toBeInTheDocument();
 });
 
 it("counts the streak across weekly puzzles", async () => {

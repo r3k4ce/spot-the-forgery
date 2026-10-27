@@ -7,23 +7,50 @@ interface Props {
   results: boolean[];
   streaks: { current: number; best: number };
   shareUrl: string;
+  onReplay: () => void;
 }
 
-export function Summary({ puzzle, results, streaks, shareUrl }: Props) {
+// Where the async clipboard is blocked (no secure context, a denied permission, some embedded
+// browsers), the older copy command still works from a click.
+function copyWithSelection(text: string): boolean {
+  if (typeof document.execCommand !== "function") return false;
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.append(area);
+  area.select();
+  try {
+    return document.execCommand("copy");
+  } finally {
+    area.remove();
+  }
+}
+
+export function Summary({ puzzle, results, streaks, shareUrl, onReplay }: Props) {
   const [status, setStatus] = useState("");
   const text = shareText(puzzle.number, results, shareUrl);
+  const canShare = typeof navigator.share === "function";
 
-  async function share() {
+  async function copy() {
     try {
-      if (typeof navigator.share === "function") {
-        await navigator.share({ text });
-        return;
-      }
       await navigator.clipboard.writeText(text);
       setStatus("Copied!");
+      return;
+    } catch {
+      // Fall through to the selection-based copy.
+    }
+    setStatus(copyWithSelection(text) ? "Copied!" : "Couldn't copy — select the text above.");
+  }
+
+  async function share() {
+    if (!canShare) return copy();
+    try {
+      await navigator.share({ text });
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      setStatus("Couldn't share — copy the text above instead.");
+      await copy();
     }
   }
 
@@ -49,17 +76,26 @@ export function Summary({ puzzle, results, streaks, shareUrl }: Props) {
       >
         {text}
       </pre>
-      <button
-        type="button"
-        onClick={share}
-        className="mt-4 rounded bg-amber-400 px-6 py-3 font-semibold text-stone-950 hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
-      >
-        Share
-      </button>
+      <div className="mt-4 flex justify-center gap-3">
+        <button
+          type="button"
+          onClick={share}
+          className="rounded bg-amber-400 px-6 py-3 font-semibold text-stone-950 hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
+        >
+          {canShare ? "Share" : "Copy result"}
+        </button>
+        <button
+          type="button"
+          onClick={onReplay}
+          className="rounded border border-stone-600 px-6 py-3 font-semibold hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
+        >
+          Play again
+        </button>
+      </div>
       <p aria-live="polite" className="mt-2 h-6 text-sm text-stone-300">
         {status}
       </p>
-      <p className="mt-6 text-stone-400">A new set arrives at midnight UTC.</p>
+      <p className="mt-6 text-stone-400">A new puzzle arrives every Monday.</p>
     </section>
   );
 }

@@ -73,12 +73,18 @@ export default function App() {
                 setGuesses(next);
                 setRevealing(true);
                 const total = load.puzzle.rounds.length;
-                if (next.length === total) {
+                // A replay doesn't change the score that counts: only the first finish is kept.
+                if (next.length === total && !(load.puzzle.date in loadHistory())) {
                   const results = next.map((g, i) => g === load.answers.rounds[i]?.fakeIndex);
                   recordResult(load.puzzle.date, { score: score(results), total });
                 }
               }}
               onNext={() => setRevealing(false)}
+              onReplay={() => {
+                saveProgress({ date: load.puzzle.date, guesses: [] });
+                setGuesses([]);
+                setRevealing(false);
+              }}
             />
           )}
         </main>
@@ -100,9 +106,19 @@ interface GameProps {
   revealing: boolean;
   onGuess: (index: number) => void;
   onNext: () => void;
+  onReplay: () => void;
 }
 
-function Game({ puzzle, dates, answers, guesses, revealing, onGuess, onNext }: GameProps) {
+function Game({
+  puzzle,
+  dates,
+  answers,
+  guesses,
+  revealing,
+  onGuess,
+  onNext,
+  onReplay,
+}: GameProps) {
   const total = puzzle.rounds.length;
   if (guesses.length >= total && !revealing) {
     const results = guesses.map((g, i) => g === answers.rounds[i]?.fakeIndex);
@@ -112,6 +128,7 @@ function Game({ puzzle, dates, answers, guesses, revealing, onGuess, onNext }: G
         results={results}
         streaks={computeStreaks(loadHistory(), dates)}
         shareUrl={location.href.split("#")[0]}
+        onReplay={onReplay}
       />
     );
   }
