@@ -1,11 +1,8 @@
 import type { DayResult } from "./types";
 
-export interface Progress {
-  date: string;
-  guesses: number[];
-}
-
+// Keys and shapes are read back from players' browsers: change them only with a migration.
 const HISTORY_KEY = "stf:history";
+const SEEN_HELP_KEY = "stf:seen-help";
 const progressKey = (date: string) => `stf:progress:${date}`;
 
 // Storage can be missing, full or blocked (private windows, embedded previews);
@@ -33,36 +30,31 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 const isDayResult = (v: unknown): v is DayResult =>
   isRecord(v) && Number.isInteger(v.score) && Number.isInteger(v.total);
 
-export function loadProgress(date: string): Progress {
+const isGuessList = (v: unknown): v is number[] =>
+  Array.isArray(v) && v.every((g) => Number.isInteger(g));
+
+// The paintings picked so far in a puzzle, one per round.
+export function loadProgress(date: string): number[] {
   const stored = read(progressKey(date));
-  if (
-    isRecord(stored) &&
-    Array.isArray(stored.guesses) &&
-    stored.guesses.every((g) => Number.isInteger(g))
-  ) {
-    return { date, guesses: stored.guesses as number[] };
-  }
-  return { date, guesses: [] };
+  return isRecord(stored) && isGuessList(stored.guesses) ? stored.guesses : [];
 }
 
-export function saveProgress(p: Progress): void {
-  write(progressKey(p.date), p);
+export function saveProgress(date: string, guesses: number[]): void {
+  write(progressKey(date), { date, guesses });
 }
 
-export function loadHistory(): Record<string, DayResult> {
+export type History = Record<string, DayResult>;
+
+// The first finished result for each puzzle, by date.
+export function loadHistory(): History {
   const stored = read(HISTORY_KEY);
   if (!isRecord(stored)) return {};
-  return Object.fromEntries(Object.entries(stored).filter(([, r]) => isDayResult(r))) as Record<
-    string,
-    DayResult
-  >;
+  return Object.fromEntries(Object.entries(stored).filter(([, r]) => isDayResult(r))) as History;
 }
 
 export function recordResult(date: string, r: DayResult): void {
   write(HISTORY_KEY, { ...loadHistory(), [date]: r });
 }
-
-const SEEN_HELP_KEY = "stf:seen-help";
 
 export const hasSeenHelp = (): boolean => read(SEEN_HELP_KEY) === true;
 

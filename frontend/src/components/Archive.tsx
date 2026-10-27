@@ -1,14 +1,14 @@
 import { puzzleHref } from "../lib/route";
-import { loadHistory, loadProgress } from "../lib/storage";
+import { loadHistory, loadProgress, type History } from "../lib/storage";
 
 interface Props {
   dates: string[];
 }
 
-function status(date: string, history: ReturnType<typeof loadHistory>): string {
+function status(date: string, history: History): string {
   const result = history[date];
   if (result) return `Scored ${result.score}/${result.total}`;
-  return loadProgress(date).guesses.length > 0 ? "In progress" : "Not played";
+  return loadProgress(date).length > 0 ? "In progress" : "Not played";
 }
 
 export function Archive({ dates }: Props) {

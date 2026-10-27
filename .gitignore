@@ -10,3 +10,4 @@ frontend/dist/
 **/.tmp-*
 .superpowers/
 frontend/coverage/
+frontend/tsconfig.tsbuildinfo

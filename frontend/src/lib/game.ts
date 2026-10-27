@@ -1,4 +1,10 @@
-import type { DayResult } from "./types";
+import type { History } from "./storage";
+import type { SealedPayload } from "./types";
+
+// Whether each guess so far found the forgery.
+export function checkGuesses(guesses: number[], answers: SealedPayload): boolean[] {
+  return guesses.map((g, i) => g === answers.rounds[i]?.fakeIndex);
+}
 
 export function score(results: boolean[]): number {
   return results.filter(Boolean).length;
@@ -9,26 +15,19 @@ export function shareText(number: number, results: boolean[], url: string): stri
   return `Spot the Forgery #${number} 🖼️\n${squares} ${score(results)}/${results.length}\n${url}`;
 }
 
-// Streaks count consecutive published puzzles, so a weekly puzzle keeps them going.
-export function computeStreaks(
-  history: Record<string, DayResult>,
-  dates: string[],
-): { current: number; best: number } {
-  const played = dates.map((d) => d in history);
-  const runEndingAt = (end: number) => {
-    let n = 0;
-    while (end - n >= 0 && played[end - n]) n++;
-    return n;
-  };
+export interface Streaks {
+  current: number;
+  best: number;
+}
 
-  let best = 0;
-  played.forEach((p, i) => {
-    if (p && !played[i + 1]) best = Math.max(best, runEndingAt(i));
-  });
-  const last = dates.length - 1;
+// Streaks count consecutive published puzzles, so a weekly puzzle keeps them going.
+export function computeStreaks(history: History, dates: string[]): Streaks {
+  // The length of the run of played puzzles ending at each date.
+  const runs: number[] = [];
+  for (const date of dates) runs.push(date in history ? (runs.at(-1) ?? 0) + 1 : 0);
   // The latest puzzle not being played yet doesn't break the run before it.
-  const current = played[last] ? runEndingAt(last) : runEndingAt(last - 1);
-  return { current, best };
+  const current = runs.at(-1) || (runs.at(-2) ?? 0);
+  return { current, best: Math.max(0, ...runs) };
 }
 
 const DAY_MS = 86_400_000;

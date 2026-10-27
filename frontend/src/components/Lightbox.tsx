@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { useModal } from "./useModal";
 
 interface Props {
   src: string;
   alt: string;
   onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  // Where focus goes on closing, if not back to what opened the zoomed view.
+  returnFocus?: () => HTMLElement | null | undefined;
+  // Only while guessing: picks the painting on screen as the fake.
   onChoose?: () => void;
-  onPrev?: () => void;
-  onNext?: () => void;
 }
 
 // A horizontal drag at least this long, and mostly sideways, counts as a swipe.
@@ -15,38 +19,32 @@ const SWIPE_PX = 50;
 const BUTTON =
   "rounded border border-stone-600 px-4 py-2 text-stone-100 hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-amber-400";
 
-export function Lightbox({ src, alt, onClose, onChoose, onPrev, onNext }: Props) {
+export function Lightbox({ src, alt, onClose, onPrev, onNext, returnFocus, onChoose }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const [actualSize, setActualSize] = useState(false);
-
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    closeRef.current?.focus();
-    return () => opener?.focus();
-  }, []);
+  useModal(dialogRef, closeRef, onClose, returnFocus);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") onPrev?.();
-      else if (e.key === "ArrowRight") onNext?.();
+      if (e.key === "ArrowLeft") onPrev();
+      else if (e.key === "ArrowRight") onNext();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, onPrev, onNext]);
+  }, [onPrev, onNext]);
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={alt}
       className="fixed inset-0 z-50 flex flex-col bg-black"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
       onTouchStart={(e) => {
-        const t = e.touches[0];
+        // A second finger makes it a pinch, not a swipe, until every finger has lifted.
+        const t = e.touches.length === 1 ? e.touches[0] : undefined;
         touchStart.current = t ? { x: t.clientX, y: t.clientY } : null;
       }}
       onTouchEnd={(e) => {
@@ -57,21 +55,17 @@ export function Lightbox({ src, alt, onClose, onChoose, onPrev, onNext }: Props)
         if (!start || !t || actualSize) return;
         const dx = t.clientX - start.x;
         if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(t.clientY - start.y)) return;
-        if (dx < 0) onNext?.();
-        else onPrev?.();
+        if (dx < 0) onNext();
+        else onPrev();
       }}
     >
       <div className="flex flex-wrap justify-end gap-2 p-3">
-        {onPrev && (
-          <button type="button" onClick={onPrev} className={BUTTON} aria-label="Previous painting">
-            ←
-          </button>
-        )}
-        {onNext && (
-          <button type="button" onClick={onNext} className={BUTTON} aria-label="Next painting">
-            →
-          </button>
-        )}
+        <button type="button" onClick={onPrev} className={BUTTON} aria-label="Previous painting">
+          ←
+        </button>
+        <button type="button" onClick={onNext} className={BUTTON} aria-label="Next painting">
+          →
+        </button>
         <button type="button" onClick={() => setActualSize((v) => !v)} className={BUTTON}>
           {actualSize ? "Fit to screen" : "Actual size"}
         </button>

@@ -1,11 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import type { PuzzleRound, RoundReveal } from "../lib/types";
 import { Lightbox } from "./Lightbox";
 
 interface Props {
   round: PuzzleRound;
-  base: string;
-  date: string;
+  imageUrl: (file: string) => string;
   reveal: RoundReveal | null;
   // Which painting sits in each position (a replay shuffles them); guesses use the
   // painting's own index, so answers still match.
@@ -19,27 +18,28 @@ function roundTitle(round: PuzzleRound): string {
     : `Four paintings from ${round.label}`;
 }
 
-export function RoundView({ round, base, date, reveal, order: shuffled, onGuess }: Props) {
+export function RoundView({ round, imageUrl, reveal, order: shuffled, onGuess }: Props) {
+  // A painting index, as guesses are. Once the answer is shown it is the player's guess,
+  // since nothing changes the selection then.
   const [selected, setSelected] = useState<number | null>(null);
   // A position on screen, not a painting index.
   const [zoomed, setZoomed] = useState<number | null>(null);
-  const order = useMemo(() => shuffled ?? round.images.map((_, i) => i), [shuffled, round]);
-  const closeZoom = useCallback(() => setZoomed(null), []);
-  const count = round.images.length;
-  // Browsing in the zoomed view moves the selection along, so the guess matches what's shown.
-  const browse = useCallback(
-    (step: number) => {
-      if (zoomed === null) return;
-      const next = (zoomed + step + count) % count;
-      setZoomed(next);
-      if (!reveal) setSelected(order[next]);
-    },
-    [zoomed, count, reveal, order],
-  );
-  const prev = useCallback(() => browse(-1), [browse]);
-  const next = useCallback(() => browse(1), [browse]);
-  const src = (file: string) => `${base}puzzles/${date}/${file}`;
-  const alt = (i: number) => `Painting ${i + 1} of ${round.images.length}`;
+  // The painting buttons by position, to put focus back on the one last shown zoomed.
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const order = shuffled ?? round.images.map((_, i) => i);
+  const count = order.length;
+  const alt = (position: number) => `Painting ${position + 1} of ${count}`;
+
+  // While guessing, looking at a painting selects it, and browsing in the zoomed view moves
+  // the selection along, so the guess always matches what's shown.
+  function zoomTo(position: number) {
+    setZoomed(position);
+    if (!reveal) setSelected(order[position]);
+  }
+
+  function browse(step: number) {
+    if (zoomed !== null) zoomTo((zoomed + step + count) % count);
+  }
 
   return (
     <section aria-labelledby="round-title">
@@ -62,16 +62,20 @@ export function RoundView({ round, base, date, reveal, order: shuffled, onGuess 
           return (
             <figure key={file} className="m-0">
               <button
+                ref={(el) => {
+                  buttons.current[position] = el;
+                }}
                 type="button"
                 aria-label={alt(position)}
                 aria-pressed={reveal ? undefined : selected === i}
-                onClick={() => {
-                  if (!reveal) setSelected(i);
-                  setZoomed(position);
-                }}
+                onClick={() => zoomTo(position)}
                 className={`block aspect-square w-full overflow-hidden rounded bg-stone-900 ${ring} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400`}
               >
-                <img src={src(file)} alt={alt(position)} className="h-full w-full object-contain" />
+                <img
+                  src={imageUrl(file)}
+                  alt={alt(position)}
+                  className="h-full w-full object-contain"
+                />
               </button>
               {reveal && (
                 <figcaption className="mt-2 text-sm">
@@ -108,7 +112,9 @@ export function RoundView({ round, base, date, reveal, order: shuffled, onGuess 
         {reveal && (
           <>
             <p className="text-lg font-semibold">
-              {selected === reveal.fakeIndex ? "Correct — you spotted the forgery." : "Not this time."}
+              {selected === reveal.fakeIndex
+                ? "Correct — you spotted the forgery."
+                : "Not this time."}
             </p>
             <p className="mx-auto mt-2 max-w-prose text-stone-300">{reveal.note}</p>
           </>
@@ -130,11 +136,12 @@ export function RoundView({ round, base, date, reveal, order: shuffled, onGuess 
 
       {zoomed !== null && (
         <Lightbox
-          src={src(round.images[order[zoomed]])}
+          src={imageUrl(round.images[order[zoomed]])}
           alt={alt(zoomed)}
-          onClose={closeZoom}
-          onPrev={prev}
-          onNext={next}
+          onClose={() => setZoomed(null)}
+          onPrev={() => browse(-1)}
+          onNext={() => browse(1)}
+          returnFocus={() => buttons.current[zoomed]}
           onChoose={
             reveal
               ? undefined
