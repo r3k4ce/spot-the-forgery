@@ -1,4 +1,11 @@
-import { computeStreaks, formatCountdown, nextPuzzleTime, score, shareText, shuffledOrder } from "./game";
+import {
+  computeStreaks,
+  formatCountdown,
+  nextPuzzleTime,
+  score,
+  shareText,
+  shuffledOrder,
+} from "./game";
 import type { DayResult } from "./types";
 
 const played: DayResult = { score: 3, total: 5 };
@@ -38,13 +45,16 @@ describe("computeStreaks", () => {
   });
 
   it("finds the best run across gaps", () => {
-    const dates = ["2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-25", "2026-10-26"];
-    const h = history("2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-25", "2026-10-26");
-    expect(computeStreaks(h, dates)).toEqual({ current: 2, best: 5 });
+    const dates = [17, 18, 19, 20, 21, 22, 25, 26].map((day) => `2026-10-${day}`);
+    const missedOne = dates.filter((d) => d !== "2026-10-22");
+    expect(computeStreaks(history(...missedOne), dates)).toEqual({ current: 2, best: 5 });
   });
 
   it("ignores played dates that are not published", () => {
-    expect(computeStreaks(history("2026-10-01", "2026-10-26"), weekly)).toEqual({ current: 1, best: 1 });
+    expect(computeStreaks(history("2026-10-01", "2026-10-26"), weekly)).toEqual({
+      current: 1,
+      best: 1,
+    });
   });
 
   it("handles an empty history and no puzzles", () => {
@@ -64,7 +74,9 @@ describe("nextPuzzleTime", () => {
 describe("formatCountdown", () => {
   const HOUR = 3_600_000;
   it("names days and hours, then hours and minutes, then minutes", () => {
-    expect(formatCountdown(5 * 24 * HOUR + 3 * HOUR + 59_000)).toBe("Next puzzle in 5 days, 3 hours");
+    expect(formatCountdown(5 * 24 * HOUR + 3 * HOUR + 59_000)).toBe(
+      "Next puzzle in 5 days, 3 hours",
+    );
     expect(formatCountdown(24 * HOUR + HOUR)).toBe("Next puzzle in 1 day, 1 hour");
     expect(formatCountdown(3 * HOUR + 12 * 60_000)).toBe("Next puzzle in 3 hours, 12 minutes");
     expect(formatCountdown(60_000)).toBe("Next puzzle in 1 minute");
