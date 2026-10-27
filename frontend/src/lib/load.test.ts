@@ -61,6 +61,27 @@ describe("loadPuzzle", () => {
     });
   });
 
+  it("loads a requested past puzzle", async () => {
+    const earlier = { ...puzzle, date: "2026-10-19" };
+    const { fn } = stubFetch({
+      "./puzzles/index.json": ["2026-10-19", "2026-10-26"],
+      "./puzzles/2026-10-19/puzzle.json": earlier,
+    });
+    expect(await loadPuzzle("./", NOW, fn, "2026-10-19")).toEqual({
+      puzzle: earlier,
+      dates: ["2026-10-19", "2026-10-26"],
+    });
+  });
+
+  it("loads the latest puzzle for an unknown or future date", async () => {
+    const { fn } = stubFetch({
+      "./puzzles/index.json": ["2026-10-19", "2026-10-26", "2026-11-02"],
+      "./puzzles/2026-10-26/puzzle.json": puzzle,
+    });
+    expect((await loadPuzzle("./", NOW, fn, "2026-11-02"))?.puzzle).toEqual(puzzle);
+    expect((await loadPuzzle("./", NOW, fn, "nonsense"))?.puzzle).toEqual(puzzle);
+  });
+
   it("resolves null when the network fails", async () => {
     const fn = (() => Promise.reject(new TypeError("offline"))) as typeof fetch;
     expect(await loadPuzzle("./", NOW, fn)).toBeNull();

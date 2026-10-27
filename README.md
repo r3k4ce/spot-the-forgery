@@ -15,7 +15,9 @@ and one is an AI forgery made in the same style. Rounds get harder as the puzzle
   each puzzle into `frontend/public/puzzles/<date>/`. The answers in `puzzle.json` are
   lightly obfuscated, not encrypted.
 - `frontend/` is a static Vite + React site that reads those files. It shows the most recent
-  puzzle dated today or earlier (UTC), and streaks count consecutive puzzles.
+  puzzle dated today or earlier (UTC); older ones are playable from the archive (`#/archive`,
+  or `#/<date>` for one puzzle). Puzzles are numbered 1, 2, 3… in publish order, and streaks
+  count consecutive puzzles. Only the first finish of a puzzle counts toward the score.
 - GitHub Actions (`weekly.yml`) builds one new puzzle every Monday at 03:00 UTC, commits it
   and redeploys GitHub Pages. There is no manual trigger.
 

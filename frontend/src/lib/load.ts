@@ -23,13 +23,15 @@ export async function loadPuzzle(
   base: string,
   now: Date = new Date(),
   fetchFn: typeof fetch = fetch,
+  requested?: string,
 ): Promise<{ puzzle: Puzzle; dates: string[] } | null> {
   try {
     const index = await getJson(`${base}puzzles/index.json`, fetchFn);
     if (!Array.isArray(index)) return null;
     const dates = index.filter((d): d is string => typeof d === "string");
     const playable = playableDates(dates, todayUtc(now));
-    const date = playable.at(-1);
+    // A past puzzle from the archive, or the latest one for anything else.
+    const date = requested && playable.includes(requested) ? requested : playable.at(-1);
     if (date === undefined) return null;
     const puzzle = (await getJson(`${base}puzzles/${date}/puzzle.json`, fetchFn)) as Puzzle;
     return { puzzle, dates: playable };

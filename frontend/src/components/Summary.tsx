@@ -1,13 +1,28 @@
-import { useState } from "react";
-import { score, shareText } from "../lib/game";
-import type { Puzzle } from "../lib/types";
+import { useEffect, useState } from "react";
+import { formatCountdown, score, shareText } from "../lib/game";
+import type { Puzzle, SealedPayload } from "../lib/types";
+import { Review } from "./Review";
 
 interface Props {
   puzzle: Puzzle;
   results: boolean[];
   streaks: { current: number; best: number };
   shareUrl: string;
+  answers: SealedPayload;
+  guesses: number[];
+  imageUrl: (file: string) => string;
+  // When the next puzzle should appear; null for a past puzzle from the archive.
+  nextPuzzle: Date | null;
   onReplay: () => void;
+}
+
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
 }
 
 // Where the async clipboard is blocked (no secure context, a denied permission, some embedded
@@ -28,8 +43,19 @@ function copyWithSelection(text: string): boolean {
   }
 }
 
-export function Summary({ puzzle, results, streaks, shareUrl, onReplay }: Props) {
+export function Summary({
+  puzzle,
+  results,
+  streaks,
+  shareUrl,
+  answers,
+  guesses,
+  imageUrl,
+  nextPuzzle,
+  onReplay,
+}: Props) {
   const [status, setStatus] = useState("");
+  const now = useNow(60_000);
   const text = shareText(puzzle.number, results, shareUrl);
   const canShare = typeof navigator.share === "function";
 
@@ -95,7 +121,15 @@ export function Summary({ puzzle, results, streaks, shareUrl, onReplay }: Props)
       <p aria-live="polite" className="mt-2 h-6 text-sm text-stone-300">
         {status}
       </p>
-      <p className="mt-6 text-stone-400">A new puzzle arrives every Monday.</p>
+      {nextPuzzle && (
+        <p className="mt-6 text-stone-400">{formatCountdown(nextPuzzle.getTime() - now)}</p>
+      )}
+      <Review
+        rounds={puzzle.rounds}
+        answers={answers.rounds}
+        guesses={guesses}
+        imageUrl={imageUrl}
+      />
     </section>
   );
 }

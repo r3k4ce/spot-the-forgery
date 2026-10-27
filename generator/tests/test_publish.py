@@ -143,8 +143,10 @@ def test_history_windows(tmp_path: Path):
     assert history.recent_paintings == expected_paintings
 
 
-def test_puzzle_number(tmp_path: Path):
+def test_puzzle_number_counts_puzzles_not_days(tmp_path: Path):
     assert puzzle_number(tmp_path, DAY) == 1
     publish_day(tmp_path, DAY, rounds(), random.Random(1))
-    assert puzzle_number(tmp_path, date(2026, 10, 30)) == 3
+    # A week later is the second puzzle, not the eighth.
+    assert puzzle_number(tmp_path, DAY + timedelta(days=7)) == 2
+    assert puzzle_number(tmp_path, DAY) == 1
     assert read_puzzle(tmp_path, DAY)["number"] == 1

@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { loadPuzzle } from "./lib/load";
@@ -58,9 +58,18 @@ const REVEAL: SealedPayload = {
   ],
 };
 
+const OLD_PUZZLE: Puzzle = { ...PUZZLE, date: "2026-10-19", number: 1 };
+const DATES = ["2026-10-19", "2026-10-26"];
+
 beforeEach(() => {
   localStorage.clear();
-  vi.mocked(loadPuzzle).mockResolvedValue({ puzzle: PUZZLE, dates: ["2026-10-19", "2026-10-26"] });
+  // Returning player: the first-visit help would cover every other test.
+  localStorage.setItem("stf:seen-help", "true");
+  window.location.hash = "";
+  vi.mocked(loadPuzzle).mockImplementation(async (_base, _now, _fetch, date) => ({
+    puzzle: date === "2026-10-19" ? OLD_PUZZLE : PUZZLE,
+    dates: DATES,
+  }));
   vi.mocked(unseal).mockResolvedValue(REVEAL);
 });
 
@@ -161,11 +170,22 @@ async function finish(user: ReturnType<typeof userEvent.setup>, first: number, s
   await user.click(screen.getByRole("button", { name: "See results" }));
 }
 
+const byFile = (file: string) =>
+  screen
+    .getAllByRole("button", { name: /^Painting \d of 4$/ })
+    .find((b) => b.querySelector("img")!.getAttribute("src")!.endsWith(file))!;
+
+async function guessFile(user: ReturnType<typeof userEvent.setup>, file: string) {
+  await user.click(byFile(file));
+  await user.keyboard("{Escape}");
+  await user.click(screen.getByRole("button", { name: "This one is the fake" }));
+}
+
 it("can play the puzzle again and keeps the first score", async () => {
   const { user } = await start();
   await finish(user, 3, 2);
   expect(screen.getByText("1/2")).toBeInTheDocument();
-  expect(screen.getByText("A new puzzle arrives every Monday.")).toBeInTheDocument();
+  expect(screen.getByText(/^Next puzzle in |^The next puzzle is on its way\.$/)).toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "Play again" }));
   expect(
@@ -173,7 +193,11 @@ it("can play the puzzle again and keeps the first score", async () => {
   ).toBeInTheDocument();
   expect(screen.queryByText("AI forgery")).not.toBeInTheDocument();
 
-  await finish(user, 3, 1);
+  // The paintings are shuffled now, so pick the fakes by image.
+  await guessFile(user, "a3.jpg");
+  await user.click(screen.getByRole("button", { name: "Next round" }));
+  await guessFile(user, "b1.jpg");
+  await user.click(screen.getByRole("button", { name: "See results" }));
   expect(screen.getByText("2/2")).toBeInTheDocument();
   expect(JSON.parse(localStorage.getItem("stf:history")!)).toEqual({
     "2026-10-26": { score: 1, total: 2 },
@@ -207,6 +231,129 @@ it("counts the streak across weekly puzzles", async () => {
   expect(current).toHaveTextContent("2");
 });
 
+it("lists every puzzle in the archive with the player's score", async () => {
+  localStorage.setItem("stf:history", JSON.stringify({ "2026-10-19": { score: 4, total: 5 } }));
+  const { user } = await start();
+  await user.click(screen.getByRole("link", { name: "Archive" }));
+  const items = await screen.findAllByRole("listitem");
+  expect(items.map((li) => li.textContent)).toEqual([
+    "Puzzle #2 · 2026-10-26Not played",
+    "Puzzle #1 · 2026-10-19Scored 4/5",
+  ]);
+});
+
+it("opens a past puzzle from the archive and comes back", async () => {
+  const { user } = await start();
+  await user.click(screen.getByRole("link", { name: "Archive" }));
+  await user.click(await screen.findByRole("link", { name: /Puzzle #1/ }));
+  expect(await screen.findByRole("heading", { level: 1, name: "Spot the Forgery #1" })).toBeInTheDocument();
+  expect(screen.getByText("2026-10-19")).toBeInTheDocument();
+  expect(loadPuzzle).toHaveBeenLastCalledWith(expect.anything(), undefined, undefined, "2026-10-19");
+
+  await user.click(screen.getByRole("link", { name: "Back to the latest puzzle" }));
+  expect(await screen.findByRole("heading", { level: 1, name: "Spot the Forgery #7" })).toBeInTheDocument();
+});
+
+it("shows progress dots for the rounds so far", async () => {
+  const { user } = await start();
+  const progress = () =>
+    within(screen.getByRole("list", { name: "Progress" }))
+      .getAllByRole("listitem")
+      .map((li) => li.textContent);
+  expect(progress()).toEqual(["Round 1: current", "Round 2: to come"]);
+  await guess(user, 3);
+  expect(progress()).toEqual(["Round 1: correct", "Round 2: to come"]);
+  await user.click(screen.getByRole("button", { name: "Next round" }));
+  await guess(user, 2);
+  expect(progress()).toEqual(["Round 1: correct", "Round 2: wrong"]);
+});
+
+it("preloads the next round's paintings", async () => {
+  await start();
+  const preloaded = [...document.head.querySelectorAll('link[rel="preload"][as="image"]')].map(
+    (l) => l.getAttribute("href"),
+  );
+  expect(preloaded).toEqual(
+    expect.arrayContaining(["b1.jpg", "b2.jpg", "b3.jpg", "b4.jpg"].map((f) => expect.stringContaining(`2026-10-26/${f}`))),
+  );
+});
+
+it("browses between paintings in the zoomed view", async () => {
+  const { user } = await start();
+  await user.click(painting(1));
+  const dialog = () => screen.getByRole("dialog");
+  expect(dialog()).toHaveAccessibleName("Painting 1 of 4");
+  await user.keyboard("{ArrowRight}");
+  expect(dialog()).toHaveAccessibleName("Painting 2 of 4");
+  await user.click(within(dialog()).getByRole("button", { name: "Previous painting" }));
+  expect(dialog()).toHaveAccessibleName("Painting 1 of 4");
+  await user.keyboard("{ArrowLeft}");
+  expect(dialog()).toHaveAccessibleName("Painting 4 of 4");
+  await user.click(within(dialog()).getByRole("button", { name: "Next painting" }));
+  expect(dialog()).toHaveAccessibleName("Painting 1 of 4");
+
+  // Swiping left moves on, as on a phone.
+  fireEvent.touchStart(dialog(), { touches: [{ clientX: 300, clientY: 200 }] });
+  fireEvent.touchEnd(dialog(), { changedTouches: [{ clientX: 120, clientY: 210 }] });
+  expect(dialog()).toHaveAccessibleName("Painting 2 of 4");
+
+  await user.click(within(dialog()).getByRole("button", { name: "This one is the fake" }));
+  expect(document.querySelector("[aria-live]")).toHaveTextContent("Not this time");
+  expect(within(screen.getAllByRole("figure")[1]).getByText("Your guess")).toBeInTheDocument();
+});
+
+it("reviews every round on the results screen", async () => {
+  const { user } = await start();
+  await finish(user, 3, 2);
+  const review = screen.getByRole("region", { name: "Review rounds" });
+  const summaries = [...review.querySelectorAll("summary")];
+  expect(summaries.map((el) => el.textContent)).toEqual([
+    "Round 1 · Thomas Eakins · Spotted it",
+    "Round 2 · Japan, Edo period (1615–1868) · Missed",
+  ]);
+  await user.click(summaries[0]);
+  expect(within(review).getByText("The oars are modern.")).toBeVisible();
+  expect(within(review).getByRole("img", { name: "Round 1, painting 3: the AI forgery, your guess" })).toBeInTheDocument();
+  await user.click(summaries[1]);
+  expect(within(review).getByRole("img", { name: "Round 2, painting 1: the AI forgery" })).toBeInTheDocument();
+  expect(within(review).getByRole("img", { name: "Round 2, painting 2: your guess" })).toBeInTheDocument();
+});
+
+it("shuffles the paintings when playing again", async () => {
+  const { user } = await start();
+  await finish(user, 3, 1);
+  await user.click(screen.getByRole("button", { name: "Play again" }));
+  const files = () => screen.getAllByRole("img").map((img) => img.getAttribute("src")!.split("/").pop());
+  expect([...files()].sort()).toEqual(["a1.jpg", "a2.jpg", "a3.jpg", "a4.jpg"]);
+  expect(files()).not.toEqual(["a1.jpg", "a2.jpg", "a3.jpg", "a4.jpg"]);
+
+  // The fake is still the fake wherever it lands.
+  const fake = byFile("a3.jpg");
+  await guessFile(user, "a3.jpg");
+  expect(document.querySelector("[aria-live]")).toHaveTextContent("Correct");
+  expect(within(fake.closest("figure")!).getByText("AI forgery")).toBeInTheDocument();
+});
+
+it("explains the game on the first visit only, and reopens from the ? button", async () => {
+  localStorage.removeItem("stf:seen-help");
+  const user = userEvent.setup();
+  const { unmount } = render(<App />);
+  const help = await screen.findByRole("dialog", { name: "How to play" });
+  expect(within(help).getByText(/one is an AI forgery/)).toBeInTheDocument();
+  expect(within(help).getByRole("button", { name: "Got it" })).toHaveFocus();
+  await user.click(within(help).getByRole("button", { name: "Got it" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  unmount();
+
+  await start();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "How to play" }));
+  expect(screen.getByRole("dialog", { name: "How to play" })).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "How to play" })).toHaveFocus();
+});
+
 it("restores progress after a reload", async () => {
   const { user, unmount } = await start();
   await guess(user, 1);
@@ -220,6 +367,10 @@ it("restores progress after a reload", async () => {
 it("works from the keyboard", async () => {
   const { user } = await start();
   const confirm = screen.getByRole("button", { name: "This one is the fake" });
+  await user.tab();
+  expect(screen.getByRole("link", { name: "Archive" })).toHaveFocus();
+  await user.tab();
+  expect(screen.getByRole("button", { name: "How to play" })).toHaveFocus();
   await user.tab();
   expect(painting(1)).toHaveFocus();
   await user.tab();

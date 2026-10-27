@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { PuzzleRound, RoundReveal } from "../lib/types";
 import { Lightbox } from "./Lightbox";
 
@@ -7,6 +7,9 @@ interface Props {
   base: string;
   date: string;
   reveal: RoundReveal | null;
+  // Which painting sits in each position (a replay shuffles them); guesses use the
+  // painting's own index, so answers still match.
+  order?: number[];
   onGuess: (index: number) => void;
 }
 
@@ -16,10 +19,25 @@ function roundTitle(round: PuzzleRound): string {
     : `Four paintings from ${round.label}`;
 }
 
-export function RoundView({ round, base, date, reveal, onGuess }: Props) {
+export function RoundView({ round, base, date, reveal, order: shuffled, onGuess }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
+  // A position on screen, not a painting index.
   const [zoomed, setZoomed] = useState<number | null>(null);
+  const order = useMemo(() => shuffled ?? round.images.map((_, i) => i), [shuffled, round]);
   const closeZoom = useCallback(() => setZoomed(null), []);
+  const count = round.images.length;
+  // Browsing in the zoomed view moves the selection along, so the guess matches what's shown.
+  const browse = useCallback(
+    (step: number) => {
+      if (zoomed === null) return;
+      const next = (zoomed + step + count) % count;
+      setZoomed(next);
+      if (!reveal) setSelected(order[next]);
+    },
+    [zoomed, count, reveal, order],
+  );
+  const prev = useCallback(() => browse(-1), [browse]);
+  const next = useCallback(() => browse(1), [browse]);
   const src = (file: string) => `${base}puzzles/${date}/${file}`;
   const alt = (i: number) => `Painting ${i + 1} of ${round.images.length}`;
 
@@ -30,7 +48,8 @@ export function RoundView({ round, base, date, reveal, onGuess }: Props) {
       </h2>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {round.images.map((file, i) => {
+        {order.map((i, position) => {
+          const file = round.images[i];
           const isFake = reveal?.fakeIndex === i;
           const real = reveal?.real.find((r) => r.index === i);
           const ring = reveal
@@ -44,15 +63,15 @@ export function RoundView({ round, base, date, reveal, onGuess }: Props) {
             <figure key={file} className="m-0">
               <button
                 type="button"
-                aria-label={alt(i)}
+                aria-label={alt(position)}
                 aria-pressed={reveal ? undefined : selected === i}
                 onClick={() => {
                   if (!reveal) setSelected(i);
-                  setZoomed(i);
+                  setZoomed(position);
                 }}
                 className={`block aspect-square w-full overflow-hidden rounded bg-stone-900 ${ring} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400`}
               >
-                <img src={src(file)} alt={alt(i)} className="h-full w-full object-contain" />
+                <img src={src(file)} alt={alt(position)} className="h-full w-full object-contain" />
               </button>
               {reveal && (
                 <figcaption className="mt-2 text-sm">
@@ -111,15 +130,17 @@ export function RoundView({ round, base, date, reveal, onGuess }: Props) {
 
       {zoomed !== null && (
         <Lightbox
-          src={src(round.images[zoomed])}
+          src={src(round.images[order[zoomed]])}
           alt={alt(zoomed)}
           onClose={closeZoom}
+          onPrev={prev}
+          onNext={next}
           onChoose={
             reveal
               ? undefined
               : () => {
                   setZoomed(null);
-                  onGuess(zoomed);
+                  onGuess(order[zoomed]);
                 }
           }
         />

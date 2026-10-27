@@ -61,3 +61,11 @@ export function loadHistory(): Record<string, DayResult> {
 export function recordResult(date: string, r: DayResult): void {
   write(HISTORY_KEY, { ...loadHistory(), [date]: r });
 }
+
+const SEEN_HELP_KEY = "stf:seen-help";
+
+export const hasSeenHelp = (): boolean => read(SEEN_HELP_KEY) === true;
+
+export function markHelpSeen(): void {
+  write(SEEN_HELP_KEY, true);
+}

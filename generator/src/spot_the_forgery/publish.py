@@ -50,10 +50,8 @@ def load_history(puzzles_dir: Path, day: date) -> History:
 
 
 def puzzle_number(puzzles_dir: Path, day: date) -> int:
-    index = load_index(puzzles_dir)
-    if not index:
-        return 1
-    return max(1, (day - date.fromisoformat(min(index))).days + 1)
+    # Count puzzles, not days, so weekly puzzles are numbered 1, 2, 3...
+    return sum(1 for d in load_index(puzzles_dir) if d < day.isoformat()) + 1
 
 
 def _round_files(
