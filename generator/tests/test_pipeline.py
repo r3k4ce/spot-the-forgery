@@ -85,12 +85,28 @@ def test_build_day_swaps_failed_group_and_orders_by_difficulty():
 
 
 def test_build_day_gives_up_after_max_swaps():
-    groups = [group(n) for n in range(12)]
+    groups = [group(n) for n in range(40)]
     brief = FakeBriefWriter(fail_groups={g.key for g in groups})
-    with pytest.raises(DayFailed):
+    with pytest.raises(DayFailed, match="group swaps"):
         build_day(
             groups, NO_HISTORY, random.Random(1), deps(FakeJudge(by_group_width), brief=brief)
         )
+
+
+def test_build_day_survives_many_unusable_shapes():
+    """Scroll and folio groups fail the shape check before any image is paid for."""
+    groups = [group(n) for n in range(30)]
+    tall = {p.image_url: (100, 1000) for g in groups[:15] for p in g.paintings}
+    forger = FakeForger()
+    rounds = build_day(
+        groups,
+        NO_HISTORY,
+        random.Random(3),
+        deps(FakeJudge(lambda shown, key: 6), forger, fetcher=FakeFetcher(sizes=tall)),
+    )
+    assert len(rounds) == 5
+    assert all(int(r.pick.group.key[1:]) >= 15 for r in rounds)
+    assert forger.calls == 15  # unusable groups cost no images
 
 
 def test_build_day_fails_when_groups_run_out():

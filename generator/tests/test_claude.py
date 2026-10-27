@@ -160,3 +160,13 @@ def test_judge_marks_real_paintings():
         "Candidate 2",
         "Candidate 3",
     ]
+
+
+def test_judge_notes_stand_alone_for_the_player():
+    """The player sees one fake beside the real paintings, never the other candidates."""
+    client, seen = client_for(scores_by_identity)
+    ClaudeJudge(client, rng=random.Random(0)).judge(SHOWN, CANDIDATES)
+    system = seen[0]["system"]
+    system = system if isinstance(system, str) else " ".join(b["text"] for b in system)
+    assert "compare it only with the real paintings" in system
+    assert "never mention the other candidates" in system

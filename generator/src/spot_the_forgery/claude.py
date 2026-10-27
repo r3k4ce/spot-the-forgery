@@ -37,7 +37,10 @@ paintings labelled "Candidate" are AI-generated forgeries of that group.
 For every candidate, score from 1 to 10 how convincingly it would pass as a fourth genuine work \
 in this set, where 10 means indistinguishable from the real paintings and 1 means obviously \
 fake. Then write 2-3 sentences, in the voice of a museum curator speaking to the player, \
-explaining what gives that candidate away. Use each candidate's number as its index."""
+explaining what gives that candidate away. The player will see only that one candidate, shown \
+beside the three real paintings, so compare it only with the real paintings and never mention \
+the other candidates, how many there were, or how this one ranks among them. Use each \
+candidate's number as its index."""
 
 
 class BriefOut(pydantic.BaseModel):

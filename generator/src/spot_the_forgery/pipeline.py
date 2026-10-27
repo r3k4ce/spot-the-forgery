@@ -33,7 +33,9 @@ from spot_the_forgery.picker import ROUNDS_PER_DAY, NotEnoughGroups, pick_day
 
 CANDIDATES_PER_ROUND = 3
 MIN_CONVINCING = 4
-MAX_GROUP_SWAPS = 5
+# Most swaps are free (a group whose paintings fail the shape check costs no images); the
+# run's image budget, not this limit, is what caps spending.
+MAX_GROUP_SWAPS = 20
 ATTEMPTS_PER_ROUND = 2
 
 log = logging.getLogger(__name__)
