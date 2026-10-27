@@ -56,6 +56,11 @@ export function RoundView({ round, base, date, reveal, onGuess }: Props) {
               </button>
               {reveal && (
                 <figcaption className="mt-2 text-sm">
+                  {selected === i && (
+                    <span className="mr-2 inline-block rounded border border-amber-400 px-2 py-0.5 text-amber-300">
+                      Your guess
+                    </span>
+                  )}
                   {isFake ? (
                     <span className="inline-block rounded bg-rose-600 px-2 py-0.5 font-semibold text-white">
                       AI forgery
@@ -105,7 +110,19 @@ export function RoundView({ round, base, date, reveal, onGuess }: Props) {
       )}
 
       {zoomed !== null && (
-        <Lightbox src={src(round.images[zoomed])} alt={alt(zoomed)} onClose={closeZoom} />
+        <Lightbox
+          src={src(round.images[zoomed])}
+          alt={alt(zoomed)}
+          onClose={closeZoom}
+          onChoose={
+            reveal
+              ? undefined
+              : () => {
+                  setZoomed(null);
+                  onGuess(zoomed);
+                }
+          }
+        />
       )}
     </section>
   );

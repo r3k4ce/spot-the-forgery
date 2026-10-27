@@ -211,3 +211,28 @@ it("uses the native share sheet when available", async () => {
   expect(share).toHaveBeenCalledWith({ text: expect.stringContaining("🟩🟩 2/2") });
   Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
 });
+
+it("fits the zoomed painting to the screen and can show actual size", async () => {
+  const { user } = await start();
+  await user.click(painting(1));
+  const dialog = screen.getByRole("dialog");
+  await user.click(within(dialog).getByRole("button", { name: "Actual size" }));
+  expect(within(dialog).getByRole("button", { name: "Fit to screen" })).toBeInTheDocument();
+});
+
+it("can guess from the zoomed view", async () => {
+  const { user } = await start();
+  await user.click(painting(3));
+  await user.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "This one is the fake" }),
+  );
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(document.querySelector("[aria-live]")).toHaveTextContent("Correct");
+});
+
+it("marks the player's pick in the reveal", async () => {
+  const { user } = await start();
+  await guess(user, 2);
+  expect(within(screen.getAllByRole("figure")[1]).getByText("Your guess")).toBeInTheDocument();
+  expect(screen.getAllByText("Your guess")).toHaveLength(1);
+});
