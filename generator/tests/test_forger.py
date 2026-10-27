@@ -124,14 +124,47 @@ def test_budget_exceeded_propagates():
     assert seen == []
 
 
-@pytest.mark.parametrize("status", [401, 402, 403])
-def test_account_errors_stop_the_run(status: int):
+def error(status: int, metadata: dict[str, Any] | None = None) -> httpx.Response:
+    body: dict[str, Any] = {"code": status, "message": "refused"}
+    if metadata is not None:
+        body["metadata"] = metadata
+    return httpx.Response(status, json={"error": body})
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(401, text="no credits"),
+        httpx.Response(402, text="no credits"),
+        httpx.Response(403, text="forbidden"),
+        error(403, {"error_type": "permission_denied"}),
+        error(403, {"limit_source": "openrouter_key_limit", "limit_usd": 1, "spend_usd": 1}),
+    ],
+)
+def test_account_errors_stop_the_run(response: httpx.Response):
     budget = Budget(5)
-    gen, seen = generator(lambda body: httpx.Response(status, text="no credits"), budget)
-    with pytest.raises(ForgerUnavailable, match=str(status)):
+    gen, seen = generator(lambda body: response, budget)
+    with pytest.raises(ForgerUnavailable, match=str(response.status_code)):
         gen.generate(BRIEF, REFS, ASPECT)
     assert len(seen) == 1
     assert budget.remaining == 4
+
+
+# OpenRouter also answers 403 when one prompt is flagged or refused; other prompts still work.
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"reasons": ["violence"], "flagged_input": "A battle scene", "provider_name": "x"},
+        {"error_type": "content_policy_violation", "provider_name": "x"},
+        {"error_type": "refusal", "provider_name": "x"},
+    ],
+)
+def test_a_flagged_prompt_fails_the_round_not_the_run(metadata: dict[str, Any]):
+    budget = Budget(5)
+    gen, seen = generator(lambda body: error(403, metadata), budget)
+    with pytest.raises(RoundFailed):
+        gen.generate(BRIEF, REFS, ASPECT)
+    assert len(seen) == 4
 
 
 def test_failure_reason_is_logged_without_the_key(caplog: pytest.LogCaptureFixture):

@@ -18,14 +18,28 @@ FALLBACK_MODEL = "tencent/hy-image-v3.5-preview"
 ATTEMPTS_PER_MODEL = 2
 TIMEOUT_SECONDS = 120
 
-# The account can't make images (bad key, no credits): retrying only burns the budget.
+# The account can't make images (bad key, no credits, a spent limit): retrying only burns the
+# budget. A 403 can also mean one prompt was flagged or refused; see _refused_prompt.
 FATAL_STATUSES = frozenset({401, 402, 403})
+REFUSAL_TYPES = frozenset({"content_policy_violation", "refusal"})
 
 log = logging.getLogger(__name__)
 
 
 class ForgerUnavailable(Exception):
     """The image API refused the account itself; the run should stop."""
+
+
+def _refused_prompt(response: httpx.Response) -> bool:
+    """Whether a 403 is about this prompt (moderation, content policy, a model refusal) rather
+    than the account. Anything unrecognised counts as the account, which stops the run."""
+    try:
+        metadata = response.json()["error"]["metadata"]
+    except (ValueError, KeyError, TypeError):
+        return False
+    if not isinstance(metadata, dict) or "limit_source" in metadata:
+        return False
+    return "flagged_input" in metadata or metadata.get("error_type") in REFUSAL_TYPES
 
 
 def _data_url(data: bytes) -> str:
@@ -85,7 +99,7 @@ class OpenRouterImageGenerator:
             )
         except httpx.HTTPError as exc:
             raise RoundFailed(f"{type(exc).__name__}: {exc}") from exc
-        if response.status_code in FATAL_STATUSES:
+        if response.status_code in FATAL_STATUSES and not _refused_prompt(response):
             raise ForgerUnavailable(f"HTTP {response.status_code}: {response.text[:200]}")
         if response.is_error:
             raise RoundFailed(f"HTTP {response.status_code}: {response.text[:200]}")
