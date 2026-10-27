@@ -73,6 +73,15 @@ def test_sniff_media_type():
         sniff_media_type(SVG)
 
 
+def test_transparency_is_flattened_the_same_with_a_colour_profile():
+    srgb = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    plain = _open(normalize(make_image(40, 30, "PNG", "RGBA")))
+    profiled = _open(normalize(make_image(40, 30, "PNG", "RGBA", icc_profile=srgb)))
+    plain_px, profiled_px = plain.getpixel((20, 15)), profiled.getpixel((20, 15))
+    assert isinstance(plain_px, tuple) and isinstance(profiled_px, tuple)
+    assert all(abs(a - b) <= 2 for a, b in zip(plain_px, profiled_px, strict=True))
+
+
 def test_random_name_deterministic_and_shape():
     a = random_name(random.Random(1))
     assert a == random_name(random.Random(1))

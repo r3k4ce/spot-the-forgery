@@ -73,20 +73,28 @@ def crop_to_aspect(data: bytes, ratio: float) -> bytes:
     return out.getvalue()
 
 
-def normalize(data: bytes) -> bytes:
-    img = _open(data)
+def _flatten_to_srgb(img: Image.Image) -> Image.Image:
+    """Plain sRGB pixels, with any transparency laid over white."""
     icc = img.info.get("icc_profile")
+    if img.mode == "P":
+        img = img.convert("RGBA")
+    # Set the alpha aside: the colour conversion below would otherwise drop it.
+    alpha = img.getchannel("A") if img.mode in ("RGBA", "LA") else None
+    colour = img.convert(img.mode[:-1]) if alpha is not None else img
     if icc:
         source = ImageCms.ImageCmsProfile(io.BytesIO(icc))
-        converted = ImageCms.profileToProfile(img, source, _SRGB, outputMode="RGB")
-        img = converted if converted is not None else img
-    if img.mode in ("RGBA", "LA", "P"):
-        img = img.convert("RGBA")
-        background = Image.new("RGB", img.size, (255, 255, 255))
-        background.paste(img, mask=img.getchannel("A"))
-        img = background
-    else:
-        img = img.convert("RGB")
+        converted = ImageCms.profileToProfile(colour, source, _SRGB, outputMode="RGB")
+        colour = converted if converted is not None else colour
+    colour = colour.convert("RGB")
+    if alpha is None:
+        return colour
+    background = Image.new("RGB", img.size, (255, 255, 255))
+    background.paste(colour, mask=alpha)
+    return background
+
+
+def normalize(data: bytes) -> bytes:
+    img = _flatten_to_srgb(_open(data))
 
     scale = LONG_EDGE / max(img.width, img.height)
     size = (max(1, round(img.width * scale)), max(1, round(img.height * scale)))
