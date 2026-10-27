@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+import random
 import sys
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
@@ -42,7 +43,11 @@ def run_generate(
     deps: Deps,
     budget: Budget,
     days_ahead: int,
+    publish_rng: random.Random | None = None,
 ) -> int:
+    # The repo is public, so where the fake sits and what the files are called must not be
+    # computable from the date. Tests pass a seeded rng to stay deterministic.
+    publish_rng = publish_rng or random.SystemRandom()
     published = set(load_index(puzzles_dir))
     for offset in range(days_ahead + 1):
         day = today + timedelta(days=offset)
@@ -55,6 +60,8 @@ def run_generate(
         if budget.remaining < MIN_IMAGES_PER_DAY:
             log.info("budget too low to start %s (%d left); stopping", day, budget.remaining)
             return 0
+        # Seeding the picks by date reveals no answers: the groups and real paintings it
+        # chooses are listed in the published puzzle.json anyway.
         try:
             rounds = build_day(groups, load_history(puzzles_dir, day), day_rng(day), deps)
         except BudgetExceeded:
@@ -67,7 +74,7 @@ def run_generate(
         except (DayFailed, ForgerUnavailable) as exc:
             log.error("could not build %s: %s", day, exc)
             return 1
-        publish_day(puzzles_dir, day, rounds, day_rng(day))
+        publish_day(puzzles_dir, day, rounds, publish_rng)
         log.info("published %s: %s", day, ", ".join(r.pick.group.label for r in rounds))
     return 0
 

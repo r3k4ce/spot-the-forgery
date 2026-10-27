@@ -1,8 +1,10 @@
 import dataclasses
+import json
+import random
 from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -14,6 +16,7 @@ from spot_the_forgery.cli import HttpxFetcher, main, run_generate
 from spot_the_forgery.forger import ForgerUnavailable
 from spot_the_forgery.models import AspectRatio, Brief, Candidate
 from spot_the_forgery.publish import load_index
+from spot_the_forgery.seal import unseal
 
 GROUPS = [group(n) for n in range(25)]
 TODAY = date(2026, 10, 26)
@@ -88,6 +91,38 @@ def test_unavailable_image_api_returns_1(tmp_path: Path):
     services = dataclasses.replace(deps(FakeJudge(by_group_width)), forger=UnavailableForger())
     assert run_generate(TODAY, tmp_path, GROUPS, services, Budget(30), days_ahead=0) == 1
     assert load_index(tmp_path) == []
+
+
+def published(
+    puzzles: Path, publish_rng: random.Random | None = None
+) -> tuple[list[list[str]], list[int]]:
+    """Build TODAY into `puzzles`; return each round's image names and fake position."""
+    services = deps(FakeJudge(by_group_width))
+    if publish_rng is None:
+        assert run_generate(TODAY, puzzles, GROUPS, services, Budget(30), days_ahead=0) == 0
+    else:
+        assert (
+            run_generate(
+                TODAY, puzzles, GROUPS, services, Budget(30), days_ahead=0, publish_rng=publish_rng
+            )
+            == 0
+        )
+    puzzle = json.loads((puzzles / TODAY.isoformat() / "puzzle.json").read_text())
+    reveals = cast(list[dict[str, Any]], unseal(puzzle["sealed"], TODAY.isoformat())["rounds"])
+    return [r["images"] for r in puzzle["rounds"]], [r["fakeIndex"] for r in reveals]
+
+
+def test_answers_cannot_be_computed_from_the_date(tmp_path: Path):
+    # The repo is public: a date-seeded shuffle would let anyone work out every answer.
+    runs = [published(tmp_path / str(n)) for n in range(6)]
+    assert len({str(names) for names, _ in runs}) == len(runs)
+    assert len({tuple(fakes) for _, fakes in runs}) > 1
+
+
+def test_publish_randomness_can_be_injected(tmp_path: Path):
+    assert published(tmp_path / "a", random.Random(7)) == published(
+        tmp_path / "b", random.Random(7)
+    )
 
 
 def test_missing_api_keys_exit_2(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
