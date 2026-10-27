@@ -28,14 +28,14 @@ def message(payload: Any, stop_reason: str = "end_turn") -> dict[str, Any]:
 
 
 def client_for(
-    respond: Callable[[dict[str, Any]], dict[str, Any]],
+    respond: Callable[[dict[str, Any]], dict[str, Any]], status: int = 200
 ) -> tuple[anthropic.Anthropic, list[dict[str, Any]]]:
     seen: list[dict[str, Any]] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
         body = json.loads(request.content)
         seen.append(body)
-        return httpx2.Response(200, json=respond(body))
+        return httpx2.Response(status, json=respond(body))
 
     http = httpx2.Client(transport=httpx2.MockTransport(handler))
     return anthropic.Anthropic(api_key="test", http_client=http, max_retries=0), seen
@@ -76,7 +76,7 @@ def test_brief_refusal_raises():
         ClaudeBriefWriter(client).write(PICK, REFS)
 
 
-def test_invalid_output_raises_round_failed():
+def test_brief_with_unsupported_aspect_raises_round_failed():
     reply = {"prompt": "x", "aspect_ratio": "7:5", "forbidden": []}
     client, _ = client_for(lambda body: message(reply))
     with pytest.raises(RoundFailed):
@@ -84,11 +84,8 @@ def test_invalid_output_raises_round_failed():
 
 
 def test_api_errors_propagate():
-    def handler(request: httpx2.Request) -> httpx2.Response:
-        return httpx2.Response(400, json={"type": "error", "error": {"type": "x", "message": "m"}})
-
-    http = httpx2.Client(transport=httpx2.MockTransport(handler))
-    client = anthropic.Anthropic(api_key="test", http_client=http, max_retries=0)
+    error = {"type": "error", "error": {"type": "x", "message": "m"}}
+    client, _ = client_for(lambda body: error, status=400)
     with pytest.raises(anthropic.APIStatusError):
         ClaudeBriefWriter(client).write(PICK, REFS)
 

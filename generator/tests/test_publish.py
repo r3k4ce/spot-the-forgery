@@ -1,12 +1,10 @@
-import io
 import json
 import random
 from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
-from imaging import make_image
-from PIL import Image
+from imaging import make_image, open_image
 
 from spot_the_forgery.models import BuiltRound, Candidate, Group, Painting, Pick, Verdict
 from spot_the_forgery.publish import load_history, load_index, publish_day, puzzle_number
@@ -68,7 +66,7 @@ def test_sealed_answers_point_at_fake(tmp_path: Path):
     fake_positions = set()
     for public, secret in zip(puzzle["rounds"], sealed["rounds"], strict=True):  # type: ignore[arg-type]
         fake_file = tmp_path / "2026-10-28" / public["images"][secret["fakeIndex"]]
-        assert Image.open(io.BytesIO(fake_file.read_bytes())).size == (1024, 512)
+        assert open_image(fake_file.read_bytes()).size == (1024, 512)
         fake_positions.add(secret["fakeIndex"])
         real_indexes = [r["index"] for r in secret["real"]]
         assert sorted([*real_indexes, secret["fakeIndex"]]) == [0, 1, 2, 3]

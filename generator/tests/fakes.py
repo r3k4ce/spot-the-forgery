@@ -1,14 +1,12 @@
 """Fake pipeline services shared by the pipeline and CLI tests."""
 
-import io
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 import httpx
-from imaging import make_image
-from PIL import Image
+from imaging import make_image, open_image
 
-from spot_the_forgery.budget import BudgetExceeded
+from spot_the_forgery.budget import Budget
 from spot_the_forgery.models import (
     Brief,
     Candidate,
@@ -22,10 +20,6 @@ from spot_the_forgery.models import (
 from spot_the_forgery.pipeline import Deps
 
 NO_HISTORY = History(recent_groups=frozenset(), recent_paintings=frozenset())
-
-
-def width_of(data: bytes) -> int:
-    return Image.open(io.BytesIO(data)).width
 
 
 @dataclass
@@ -62,40 +56,51 @@ class FakeBriefWriter:
 
 @dataclass
 class FakeForger:
+    """Makes a PNG per call. Call n (1-based) is `10 + n` pixels wide unless `size` is set."""
+
     fail_calls: set[int] = field(default_factory=set)
-    budget_after: int | None = None
+    budget: Budget | None = None  # spent once per call, failed or not, like the real forger
     size: tuple[int, int] | None = None
     calls: int = 0
     briefs: list[Brief] = field(default_factory=list)
 
     def generate(self, brief: Brief, reference_images: Sequence[bytes]) -> Candidate:
+        if self.budget is not None:
+            self.budget.spend()
         self.calls += 1
         self.briefs.append(brief)
-        if self.budget_after is not None and self.calls > self.budget_after:
-            raise BudgetExceeded("out")
         if self.calls in self.fail_calls:
             raise RoundFailed("image failed")
         width, height = self.size or (10 + self.calls, 10)
         return Candidate(data=make_image(width, height, "PNG"), model="m")
 
 
+# score(shown images, judge call number (1-based), candidate index) -> convincing score
+Score = Callable[[Sequence[bytes], int, int], int]
+
+
 @dataclass
 class FakeJudge:
-    score: Callable[[Sequence[bytes], int], int]
-    calls: list[int] = field(default_factory=list)
+    score: Score
+    calls: list[int] = field(default_factory=list)  # how many candidates each call judged
 
     def judge(self, shown: Sequence[bytes], candidates: Sequence[Candidate]) -> list[Verdict]:
         self.calls.append(len(candidates))
-        attempt = len(self.calls)
+        call = len(self.calls)
         return [
-            Verdict(convincing=self.score(shown, attempt * 10 + i), tells=f"t{i}")
+            Verdict(convincing=self.score(shown, call, i), tells=f"t{i}")
             for i in range(len(candidates))
         ]
 
 
-def scripted(*rounds: list[int]) -> Callable[[Sequence[bytes], int], int]:
-    """Judge attempt n (1-based) returns rounds[n-1][i] for candidate i."""
-    return lambda shown, key: rounds[key // 10 - 1][key % 10]
+def scripted(*calls: list[int]) -> Score:
+    """Judge call n (1-based) scores candidate i as calls[n - 1][i]."""
+    return lambda shown, call, i: calls[call - 1][i]
+
+
+def by_group_width(shown: Sequence[bytes], call: int, i: int) -> int:
+    """Groups g0..g4 score 4..8 (FakeFetcher makes group n's images 400 + n wide)."""
+    return 4 + open_image(shown[0]).width % 5
 
 
 def group(n: int, size: int = 6) -> Group:
@@ -124,7 +129,3 @@ def deps(
         forger=forger or FakeForger(),
         judge=judge,
     )
-
-
-def by_group_width(shown: Sequence[bytes], key: int) -> int:
-    return 4 + width_of(shown[0]) % 5  # groups g0..g4 score 4..8

@@ -1,11 +1,10 @@
 from datetime import date
 
 import pytest
+from fakes import NO_HISTORY
 
 from spot_the_forgery.models import Group, History, Painting
 from spot_the_forgery.picker import NotEnoughGroups, day_rng, pick_day, pick_group
-
-NO_HISTORY = History(recent_groups=frozenset(), recent_paintings=frozenset())
 
 
 def group(key: str, size: int, start: int = 0) -> Group:
@@ -33,7 +32,7 @@ def test_pick_group_minimum():
     assert (len(pick.shown), len(pick.references), len(pick.spares)) == (3, 1, 0)
 
 
-def test_recent_paintings_excluded():
+def test_group_too_small_once_recent_paintings_are_left_out():
     history = History(recent_groups=frozenset(), recent_paintings=frozenset({0, 1}))
     assert pick_group(group("a", 5), history, day_rng(date(2026, 10, 28))) is None
 
@@ -45,7 +44,7 @@ def test_recent_paintings_never_picked():
     assert not ({0, 1} & (ids(pick.shown) | ids(pick.references) | ids(pick.spares)))
 
 
-def test_recent_groups_excluded():
+def test_recent_and_excluded_groups_are_skipped():
     groups = [group(f"g{i}", 4, start=i * 10) for i in range(9)]
     history = History(recent_groups=frozenset({"g0", "g1"}), recent_paintings=frozenset())
     picks = pick_day(groups, history, day_rng(date(2026, 10, 28)), exclude=frozenset({"g2"}))

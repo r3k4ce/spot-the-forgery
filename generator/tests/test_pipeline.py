@@ -1,4 +1,3 @@
-import io
 import random
 
 import pytest
@@ -13,11 +12,10 @@ from fakes import (
     group,
     pick_of,
     scripted,
-    width_of,
 )
-from PIL import Image
+from imaging import open_image
 
-from spot_the_forgery.budget import BudgetExceeded
+from spot_the_forgery.budget import Budget, BudgetExceeded
 from spot_the_forgery.models import RoundFailed
 from spot_the_forgery.pipeline import DayFailed, build_day, build_round
 
@@ -26,7 +24,7 @@ def test_build_round_picks_best_candidate():
     forger = FakeForger()
     built = build_round(pick_of(group(1)), deps(FakeJudge(scripted([3, 8, 5])), forger))
     assert built.verdict.convincing == 8
-    assert width_of(built.fake.data) == 12  # the second candidate generated
+    assert open_image(built.fake.data).width == 12  # the second candidate generated
     assert forger.calls == 3
     assert len(built.shown_images) == 3
 
@@ -61,7 +59,7 @@ def test_extreme_aspect_swapped_from_spares():
     fetcher = FakeFetcher(sizes={g.paintings[1].image_url: (1000, 300)})
     built = build_round(pick_of(g), deps(FakeJudge(scripted([5, 5, 5])), fetcher=fetcher))
     assert [p.id for p in built.pick.shown] == [10, 14, 12]
-    assert [width_of(i) for i in built.shown_images] == [401, 401, 401]
+    assert [open_image(i).width for i in built.shown_images] == [401, 401, 401]
 
 
 def test_extreme_aspect_without_spares_fails():
@@ -102,7 +100,7 @@ def test_build_day_survives_many_unusable_shapes():
         groups,
         NO_HISTORY,
         random.Random(3),
-        deps(FakeJudge(lambda shown, key: 6), forger, fetcher=FakeFetcher(sizes=tall)),
+        deps(FakeJudge(lambda shown, call, i: 6), forger, fetcher=FakeFetcher(sizes=tall)),
     )
     assert len(rounds) == 5
     assert all(int(r.pick.group.key[1:]) >= 15 for r in rounds)
@@ -120,7 +118,7 @@ def test_build_day_fails_when_groups_run_out():
 
 def test_budget_exceeded_bubbles_up():
     groups = [group(n) for n in range(6)]
-    forger = FakeForger(budget_after=4)
+    forger = FakeForger(budget=Budget(4))
     with pytest.raises(BudgetExceeded):
         build_day(groups, NO_HISTORY, random.Random(1), deps(FakeJudge(by_group_width), forger))
 
@@ -167,5 +165,4 @@ def test_fake_takes_the_shape_of_a_shown_painting():
     forger = FakeForger(size=(300, 300))
     built = build_round(pick_of(g), deps(FakeJudge(scripted([5, 5, 5])), forger, fetcher=fetcher))
     assert {b.aspect_ratio for b in forger.briefs} == {"16:9"}
-    fake = Image.open(io.BytesIO(built.fake.data))
-    assert fake.size == (300, 180)
+    assert open_image(built.fake.data).size == (300, 180)

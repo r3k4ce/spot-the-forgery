@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 import pytest
-from imaging import make_image
+from imaging import SVG, make_image
 
 from spot_the_forgery.budget import Budget, BudgetExceeded
 from spot_the_forgery.forger import (
@@ -21,7 +21,6 @@ from spot_the_forgery.models import Brief, RoundFailed
 BRIEF = Brief(prompt="A river at dusk", aspect_ratio="3:2", forbidden=("electric light", "plastic"))
 REFS = [make_image(30, 20, "JPEG")]
 PNG = make_image(64, 48, "PNG")
-SVG = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>'
 
 
 def ok(data: bytes) -> httpx.Response:

@@ -1,9 +1,8 @@
-import io
 import random
 import re
 
 import pytest
-from imaging import make_image
+from imaging import SVG, make_image, open_image
 from PIL import Image, ImageCms
 
 from spot_the_forgery.normalize import (
@@ -14,8 +13,6 @@ from spot_the_forgery.normalize import (
     random_name,
     sniff_media_type,
 )
-
-SVG = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>'
 
 
 def _exif_jpeg() -> bytes:
@@ -33,24 +30,18 @@ def _inputs() -> list[bytes]:
     return [make_image(700, 500, "PNG", "RGBA"), _exif_jpeg(), _icc_jpeg()]
 
 
-def _open(data: bytes) -> Image.Image:
-    img = Image.open(io.BytesIO(data))
-    img.load()
-    return img
-
-
 def test_normalize_long_edge_both_ways():
-    small = _open(normalize(make_image(700, 500, "PNG", "RGBA")))
+    small = open_image(normalize(make_image(700, 500, "PNG", "RGBA")))
     assert small.width == 1024
     assert abs(small.height - 731) <= 1
-    tall = _open(normalize(_exif_jpeg()))
+    tall = open_image(normalize(_exif_jpeg()))
     assert tall.height == 1024
     assert abs(tall.width - 683) <= 1
 
 
 def test_normalize_strips_metadata_and_format():
     for data in _inputs():
-        img = _open(normalize(data))
+        img = open_image(normalize(data))
         assert img.format == "JPEG"
         assert img.mode == "RGB"
         assert len(img.getexif()) == 0
@@ -58,7 +49,7 @@ def test_normalize_strips_metadata_and_format():
 
 
 def test_normalize_identical_settings():
-    outputs = [_open(normalize(data)) for data in _inputs()]
+    outputs = [open_image(normalize(data)) for data in _inputs()]
     for img in outputs:
         assert img.info.get("progressive") or img.info.get("progression")
     tables = [img.quantization for img in outputs]  # type: ignore[attr-defined]
@@ -82,8 +73,8 @@ def test_sniff_media_type():
 
 def test_transparency_is_flattened_the_same_with_a_colour_profile():
     srgb = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
-    plain = _open(normalize(make_image(40, 30, "PNG", "RGBA")))
-    profiled = _open(normalize(make_image(40, 30, "PNG", "RGBA", icc_profile=srgb)))
+    plain = open_image(normalize(make_image(40, 30, "PNG", "RGBA")))
+    profiled = open_image(normalize(make_image(40, 30, "PNG", "RGBA", icc_profile=srgb)))
     plain_px, profiled_px = plain.getpixel((20, 15)), profiled.getpixel((20, 15))
     assert isinstance(plain_px, tuple) and isinstance(profiled_px, tuple)
     assert all(abs(a - b) <= 2 for a, b in zip(plain_px, profiled_px, strict=True))
@@ -99,7 +90,7 @@ def test_transparency_is_flattened_the_same_with_a_colour_profile():
 )
 def test_unusable_colour_profile_is_ignored(mode: str, fmt: str, profile):
     icc = ImageCms.ImageCmsProfile(profile).tobytes() if profile else b"not a profile"
-    img = _open(normalize(make_image(40, 30, fmt, mode, icc_profile=icc)))
+    img = open_image(normalize(make_image(40, 30, fmt, mode, icc_profile=icc)))
     assert (img.format, img.mode) == ("JPEG", "RGB")
 
 
@@ -109,8 +100,8 @@ def test_exif_rotation_is_applied_not_dropped():
     exif[0x0112] = 6  # Orientation: rotate 90° clockwise to display
     sideways = make_image(200, 100, exif=exif.tobytes())
     assert aspect_of(sideways) == 0.5
-    assert _open(normalize(sideways)).size == (512, 1024)
-    assert _open(crop_to_aspect(sideways, 0.25)).size == (50, 200)
+    assert open_image(normalize(sideways)).size == (512, 1024)
+    assert open_image(crop_to_aspect(sideways, 0.25)).size == (50, 200)
 
 
 def test_random_name_deterministic_and_shape():
