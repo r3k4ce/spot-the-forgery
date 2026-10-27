@@ -274,6 +274,46 @@ it("works from the keyboard", async () => {
   expect(confirm).toHaveFocus();
 });
 
+it("keeps keyboard focus with the game as it moves on", async () => {
+  const { user } = await start();
+  await guess(user, 3);
+  expect(screen.getByRole("button", { name: "Next round" })).toHaveFocus();
+  // Moving focus mustn't cost the screen-reader announcement of the answer.
+  expect(liveRegion()).toHaveTextContent("Correct");
+  await user.keyboard("{Enter}");
+  expect(screen.getByRole("heading", { name: ROUND_2 })).toHaveFocus();
+
+  // Guessing from the zoomed view lands in the same place once it closes.
+  await user.click(painting(2));
+  await user.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "This one is the fake" }),
+  );
+  expect(screen.getByRole("button", { name: "See results" })).toHaveFocus();
+  expect(liveRegion()).toHaveTextContent("Not this time");
+  await user.keyboard("{Enter}");
+  expect(screen.getByRole("heading", { name: "Your result" })).toHaveFocus();
+
+  await user.click(screen.getByRole("button", { name: "Play again" }));
+  expect(screen.getByRole("heading", { name: ROUND_1 })).toHaveFocus();
+});
+
+it("leaves focus where the browser puts it on load and after a reload", async () => {
+  const first = await start();
+  expect(document.body).toHaveFocus();
+  await guess(first.user, 3);
+  first.unmount();
+  const reloaded = await start();
+  expect(document.body).toHaveFocus();
+  reloaded.unmount();
+
+  // A finished puzzle opens on the results without grabbing focus either.
+  const progress = { date: "2026-10-26", guesses: [2, 0] };
+  localStorage.setItem("stf:progress:2026-10-26", JSON.stringify(progress));
+  render(<App />);
+  await screen.findByRole("heading", { name: "Your result" });
+  expect(document.body).toHaveFocus();
+});
+
 describe("the zoomed view", () => {
   it("browses between paintings", async () => {
     const { user } = await start();

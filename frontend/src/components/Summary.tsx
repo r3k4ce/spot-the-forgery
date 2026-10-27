@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Ref } from "react";
 import { formatCountdown, score, shareText, type Streaks } from "../lib/game";
 import type { Puzzle, SealedPayload } from "../lib/types";
 import { Review } from "./Review";
@@ -16,6 +16,8 @@ interface Props {
   // When the next puzzle should appear; null for a past puzzle from the archive.
   nextPuzzle: Date | null;
   onReplay: () => void;
+  // Focused when the player moves on to the results.
+  headingRef?: Ref<HTMLHeadingElement>;
 }
 
 // Its own component so the clock only ticks, once a minute, while a countdown is on screen.
@@ -57,6 +59,7 @@ export function Summary({
   imageUrl,
   nextPuzzle,
   onReplay,
+  headingRef,
 }: Props) {
   const [status, setStatus] = useState("");
   // A replay can't share a better score than the first finish.
@@ -88,7 +91,12 @@ export function Summary({
 
   return (
     <section aria-labelledby="summary-title" className="text-center">
-      <h2 id="summary-title" className="font-serif text-2xl">
+      <h2
+        id="summary-title"
+        ref={headingRef}
+        tabIndex={-1}
+        className="font-serif text-2xl focus:outline-none"
+      >
         Your result
       </h2>
       <p className="mt-4 text-5xl font-bold">{`${score(results)}/${results.length}`}</p>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { preload } from "react-dom";
 import { checkGuesses, computeStreaks, nextPuzzleTime, score } from "../lib/game";
 import { imageUrl } from "../lib/load";
@@ -41,6 +41,19 @@ export function Game({ puzzle, answers, dates, isLatest, played, orders, onRepla
   const [revealing, setRevealing] = useState(false);
   const results = checkGuesses(guesses, answers);
   const src = (file: string) => imageUrl(date, file);
+  // The button that was pressed goes away with each step, so focus would drop to the page. Only
+  // the player's own actions set this, so a load or reload leaves focus where the browser puts it.
+  const pendingFocus = useRef<"next" | "heading" | null>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  // The round's heading, or the results heading once the puzzle is done.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    // Runs after a closing zoomed view has handed focus back to its painting, so this wins.
+    const target = pendingFocus.current;
+    pendingFocus.current = null;
+    if (target === "next") nextRef.current?.focus();
+    else if (target === "heading") headingRef.current?.focus();
+  });
 
   function keep(next: number[]) {
     played.set(date, next);
@@ -52,6 +65,7 @@ export function Game({ puzzle, answers, dates, isLatest, played, orders, onRepla
     const next = [...guesses, index];
     keep(next);
     setRevealing(true);
+    pendingFocus.current = "next";
     // A replay doesn't change the score that counts: only the first finish is kept.
     if (next.length === total && !(date in loadHistory())) {
       const finished = checkGuesses(next, answers);
@@ -62,7 +76,14 @@ export function Game({ puzzle, answers, dates, isLatest, played, orders, onRepla
   function replay() {
     keep([]);
     setRevealing(false);
+    pendingFocus.current = "heading";
     onReplay();
+  }
+
+  // On to the next round, or to the results after the last one.
+  function moveOn() {
+    setRevealing(false);
+    pendingFocus.current = "heading";
   }
 
   if (guesses.length >= total && !revealing) {
@@ -79,6 +100,7 @@ export function Game({ puzzle, answers, dates, isLatest, played, orders, onRepla
         imageUrl={src}
         nextPuzzle={isLatest ? nextPuzzleTime(date) : null}
         onReplay={replay}
+        headingRef={headingRef}
       />
     );
   }
@@ -101,12 +123,14 @@ export function Game({ puzzle, answers, dates, isLatest, played, orders, onRepla
         reveal={revealing ? (answers.rounds[index] ?? null) : null}
         order={orders?.[index]}
         onGuess={guess}
+        headingRef={headingRef}
       />
       {revealing && (
         <div className="mt-6 text-center">
           <button
+            ref={nextRef}
             type="button"
-            onClick={() => setRevealing(false)}
+            onClick={moveOn}
             className="rounded border border-amber-400 px-6 py-3 font-semibold text-amber-300 hover:bg-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
           >
             {guesses.length === total ? "See results" : "Next round"}
