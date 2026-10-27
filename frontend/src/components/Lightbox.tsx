@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useModal } from "./useModal";
 
 interface Props {
   src: string;
@@ -16,28 +17,24 @@ const BUTTON =
   "rounded border border-stone-600 px-4 py-2 text-stone-100 hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-amber-400";
 
 export function Lightbox({ src, alt, onClose, onChoose, onPrev, onNext }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const [actualSize, setActualSize] = useState(false);
-
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    closeRef.current?.focus();
-    return () => opener?.focus();
-  }, []);
+  useModal(dialogRef, closeRef, onClose);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") onPrev?.();
+      if (e.key === "ArrowLeft") onPrev?.();
       else if (e.key === "ArrowRight") onNext?.();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, onPrev, onNext]);
+  }, [onPrev, onNext]);
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={alt}

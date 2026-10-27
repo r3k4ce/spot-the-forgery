@@ -307,6 +307,22 @@ describe("the zoomed view", () => {
     expect(painting(1)).toHaveFocus();
   });
 
+  it("keeps keyboard focus inside", async () => {
+    const { user } = await start();
+    await user.click(painting(1));
+    const dialog = screen.getByRole("dialog");
+    const button = (name: string) => within(dialog).getByRole("button", { name });
+    expect(button("Close")).toHaveFocus();
+    await user.tab();
+    expect(button("Previous painting")).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(button("Close")).toHaveFocus();
+    for (let i = 0; i < 6; i++) {
+      await user.tab();
+      expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    }
+  });
+
   it("fits the painting to the screen and can show actual size", async () => {
     const { user } = await start();
     await user.click(painting(1));
@@ -487,6 +503,16 @@ it("explains the game on the first visit only, and reopens from the ? button", a
   await user.keyboard("{Escape}");
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "How to play" })).toHaveFocus();
+});
+
+it("keeps keyboard focus inside the help", async () => {
+  const { user } = await start();
+  await user.click(screen.getByRole("button", { name: "How to play" }));
+  const gotIt = within(screen.getByRole("dialog")).getByRole("button", { name: "Got it" });
+  await user.tab();
+  expect(gotIt).toHaveFocus();
+  await user.tab({ shift: true });
+  expect(gotIt).toHaveFocus();
 });
 
 it("says when there is no puzzle", async () => {
