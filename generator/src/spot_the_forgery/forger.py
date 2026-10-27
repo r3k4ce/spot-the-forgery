@@ -95,4 +95,4 @@ class OpenRouterImageGenerator:
             raise RoundFailed(f"unusable response: {type(exc).__name__}: {exc}") from exc
         cost = (payload.get("usage") or {}).get("cost")
         log.info("image from %s (%s, cost %s)", model, media_type, cost)
-        return Candidate(data=data, media_type=media_type, model=model)
+        return Candidate(data=data, model=model)

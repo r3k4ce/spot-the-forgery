@@ -8,8 +8,9 @@ from dataclasses import dataclass
 
 import httpx
 
-from spot_the_forgery.claude import SUPPORTED_ASPECTS
 from spot_the_forgery.models import (
+    SUPPORTED_ASPECTS,
+    AspectRatio,
     BriefWriter,
     BuiltRound,
     Candidate,
@@ -32,6 +33,8 @@ from spot_the_forgery.normalize import (
 from spot_the_forgery.picker import ROUNDS_PER_DAY, NotEnoughGroups, pick_day
 
 CANDIDATES_PER_ROUND = 3
+# What a day costs when every round succeeds first time; retries and swaps cost more.
+MIN_IMAGES_PER_DAY = ROUNDS_PER_DAY * CANDIDATES_PER_ROUND
 MIN_CONVINCING = 4
 # Most swaps are free (a group whose paintings fail the shape check costs no images); the
 # run's image budget, not this limit, is what caps spending.
@@ -83,9 +86,20 @@ def _fetch_shown(pick: Pick, fetcher: ImageFetcher) -> tuple[Pick, tuple[bytes, 
     return swapped, tuple(images)
 
 
+def _fetch_references(pick: Pick, fetcher: ImageFetcher) -> list[bytes]:
+    references: list[bytes] = []
+    for painting in pick.references:
+        data = _fetch(fetcher, painting)
+        if data is None:
+            raise RoundFailed(f"reference painting {painting.id} is unavailable")
+        references.append(data)
+    return references
+
+
 def _candidates(
-    deps: Deps, pick: Pick, references: Sequence[bytes], aspect: str
+    deps: Deps, pick: Pick, references: Sequence[bytes], aspect: AspectRatio
 ) -> list[Candidate]:
+    # The brief's own aspect ratio is replaced: the fake must match a shown painting.
     brief = dataclasses.replace(deps.brief_writer.write(pick, references), aspect_ratio=aspect)
     candidates: list[Candidate] = []
     for _ in range(CANDIDATES_PER_ROUND):
@@ -100,12 +114,7 @@ def _candidates(
 
 def build_round(pick: Pick, deps: Deps) -> BuiltRound:
     pick, shown_images = _fetch_shown(pick, deps.fetcher)
-    references: list[bytes] = []
-    for painting in pick.references:
-        data = _fetch(deps.fetcher, painting)
-        if data is None:
-            raise RoundFailed(f"reference painting {painting.id} is unavailable")
-        references.append(data)
+    references = _fetch_references(pick, deps.fetcher)
     # The fake takes the exact shape of the first shown painting, so its proportions
     # don't stand out from the real ones.
     target = aspect_of(shown_images[0])
@@ -116,9 +125,7 @@ def build_round(pick: Pick, deps: Deps) -> BuiltRound:
         best, verdict = max(zip(candidates, verdicts, strict=True), key=lambda cv: cv[1].convincing)
         log.info("%s attempt %d: best score %d", pick.group.label, attempt, verdict.convincing)
         if verdict.convincing >= MIN_CONVINCING:
-            fake = dataclasses.replace(
-                best, data=crop_to_aspect(best.data, target), media_type="image/png"
-            )
+            fake = dataclasses.replace(best, data=crop_to_aspect(best.data, target))
             return BuiltRound(pick=pick, shown_images=shown_images, fake=fake, verdict=verdict)
     raise RoundFailed(f"forgeries for {pick.group.key} were too obvious")
 

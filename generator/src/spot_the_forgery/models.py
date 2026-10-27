@@ -2,9 +2,13 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Literal, Protocol, get_args
 
 GroupKind = Literal["artist", "culture"]
+
+# The "w:h" shapes the image API can generate.
+AspectRatio = Literal["1:1", "2:1", "16:9", "3:2", "4:3", "5:4", "4:5", "3:4", "2:3", "9:16", "1:2"]
+SUPPORTED_ASPECTS: tuple[AspectRatio, ...] = get_args(AspectRatio)
 
 
 @dataclass(frozen=True)
@@ -29,21 +33,20 @@ class Pick:
     group: Group
     shown: tuple[Painting, ...]  # exactly 3
     references: tuple[Painting, ...]  # 1-3, never shown in the round
-    spares: tuple[Painting, ...]  # replacements for shown paintings with a bad aspect ratio
+    spares: tuple[Painting, ...]  # replace shown paintings with a dead link or a bad shape
 
 
 @dataclass(frozen=True)
 class Brief:
     prompt: str
-    aspect_ratio: str
+    aspect_ratio: AspectRatio
     forbidden: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class Candidate:
     data: bytes
-    media_type: str
-    model: str
+    model: str  # which image model made it
 
 
 @dataclass(frozen=True)

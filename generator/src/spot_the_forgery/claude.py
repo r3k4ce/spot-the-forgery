@@ -3,19 +3,26 @@
 import base64
 import random
 from collections.abc import Sequence
-from typing import Any, Literal
 
 import anthropic
 import pydantic
+from anthropic.types import ImageBlockParam, TextBlockParam
 
-from spot_the_forgery.models import Brief, Candidate, Pick, RoundFailed, Verdict
+from spot_the_forgery.models import (
+    SUPPORTED_ASPECTS,
+    AspectRatio,
+    Brief,
+    Candidate,
+    Pick,
+    RoundFailed,
+    Verdict,
+)
 from spot_the_forgery.normalize import sniff_media_type
 
 DEFAULT_MODEL = "claude-haiku-5-5"
 MAX_TOKENS = 8000
-SUPPORTED_ASPECTS = ("1:1", "2:1", "16:9", "3:2", "4:3", "5:4", "4:5", "3:4", "2:3", "9:16", "1:2")
 
-AspectRatio = Literal["1:1", "2:1", "16:9", "3:2", "4:3", "5:4", "4:5", "3:4", "2:3", "9:16", "1:2"]
+Content = list[TextBlockParam | ImageBlockParam]
 
 BRIEF_SYSTEM = """You brief an art forger for a guessing game. You are shown genuine \
 paintings from one group: either a single named artist, or anonymous works from one culture \
@@ -59,34 +66,30 @@ class JudgeOut(pydantic.BaseModel):
     scores: list[CandidateScore]
 
 
-def _image_block(data: bytes) -> dict[str, Any]:
+def _image(data: bytes) -> ImageBlockParam:
     return {
         "type": "image",
         "source": {
             "type": "base64",
             "media_type": sniff_media_type(data),
-            "data": base64.standard_b64encode(data).decode("ascii"),
+            "data": base64.b64encode(data).decode("ascii"),
         },
     }
 
 
-def _text(text: str) -> dict[str, Any]:
+def _text(text: str) -> TextBlockParam:
     return {"type": "text", "text": text}
 
 
 def _parse[T: pydantic.BaseModel](
-    client: anthropic.Anthropic,
-    model: str,
-    system: str,
-    content: list[dict[str, Any]],
-    output: type[T],
+    client: anthropic.Anthropic, model: str, system: str, content: Content, output: type[T]
 ) -> T:
     try:
         response = client.messages.parse(
             model=model,
             max_tokens=MAX_TOKENS,
             system=system,
-            messages=[{"role": "user", "content": content}],  # type: ignore[list-item]
+            messages=[{"role": "user", "content": content}],
             output_format=output,
         )
     except pydantic.ValidationError as exc:
@@ -104,10 +107,9 @@ class ClaudeBriefWriter:
     def write(self, pick: Pick, reference_images: Sequence[bytes]) -> Brief:
         group = pick.group
         who = "the artist" if group.kind == "artist" else "anonymous painters of"
-        content: list[dict[str, Any]] = [_text(f"Genuine paintings by {who} {group.label}:")]
-        for painting, data in zip(pick.references, reference_images, strict=False):
-            content.append(_text(f"{painting.title} ({painting.date})"))
-            content.append(_image_block(data))
+        content: Content = [_text(f"Genuine paintings by {who} {group.label}:")]
+        for painting, data in zip(pick.references, reference_images, strict=True):
+            content += [_text(f"{painting.title} ({painting.date})"), _image(data)]
         content.append(_text(f"Allowed aspect ratios: {', '.join(SUPPORTED_ASPECTS)}."))
         out = _parse(self._client, self._model, BRIEF_SYSTEM, content, BriefOut)
         return Brief(
@@ -127,23 +129,23 @@ class ClaudeJudge:
         self._rng = rng or random.Random()
 
     def judge(self, shown: Sequence[bytes], candidates: Sequence[Candidate]) -> list[Verdict]:
+        # Present the candidates in a random order, so any position bias in the judge
+        # doesn't always land on the same candidate.
         order = list(range(len(candidates)))
-        self._rng.shuffle(order)  # order[position] = original index
+        self._rng.shuffle(order)  # order[n - 1] is the candidate presented as number n
+        number = {original: n for n, original in enumerate(order, start=1)}
 
-        content: list[dict[str, Any]] = []
+        content: Content = []
         for letter, data in zip("ABC", shown, strict=False):
-            content += [_text(f"Real painting {letter}"), _image_block(data)]
-        for position, original in enumerate(order, start=1):
-            content += [_text(f"Candidate {position}"), _image_block(candidates[original].data)]
+            content += [_text(f"Real painting {letter}"), _image(data)]
+        for n, original in enumerate(order, start=1):
+            content += [_text(f"Candidate {n}"), _image(candidates[original].data)]
 
         out = _parse(self._client, self._model, JUDGE_SYSTEM, content, JudgeOut)
-        by_position = {s.index: s for s in out.scores}
-        expected = set(range(1, len(candidates) + 1))
-        if len(out.scores) != len(candidates) or set(by_position) != expected:
+        scores = {s.index: s for s in out.scores}
+        if len(out.scores) != len(candidates) or set(scores) != set(number.values()):
             raise RoundFailed("judge did not score every candidate exactly once")
-
-        verdicts: list[Verdict | None] = [None] * len(candidates)
-        for position, original in enumerate(order, start=1):
-            score = by_position[position]
-            verdicts[original] = Verdict(convincing=score.convincing, tells=score.tells)
-        return [v for v in verdicts if v is not None]
+        return [
+            Verdict(convincing=scores[number[i]].convincing, tells=scores[number[i]].tells)
+            for i in range(len(candidates))
+        ]

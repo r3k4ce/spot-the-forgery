@@ -4,6 +4,7 @@ import io
 import logging
 import random
 from collections.abc import Sequence
+from typing import Literal
 
 from PIL import Image, ImageCms, ImageOps
 
@@ -14,7 +15,13 @@ JPEG_QUALITY = 85
 MIN_ASPECT = 0.5
 MAX_ASPECT = 2.0
 
-_MEDIA_TYPES = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}
+MediaType = Literal["image/jpeg", "image/png", "image/webp"]
+
+_MEDIA_TYPES: dict[str, MediaType] = {
+    "JPEG": "image/jpeg",
+    "PNG": "image/png",
+    "WEBP": "image/webp",
+}
 _SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB"))
 
 
@@ -30,7 +37,7 @@ def _open(data: bytes) -> Image.Image:
     return img
 
 
-def sniff_media_type(data: bytes) -> str:
+def sniff_media_type(data: bytes) -> MediaType:
     """Media type of a raster image we accept; ValueError for anything else."""
     fmt = _open(data).format
     if fmt not in _MEDIA_TYPES:
@@ -51,7 +58,7 @@ def aspect_ok(data: bytes) -> bool:
         return False
 
 
-def nearest_aspect(ratio: float, allowed: Sequence[str]) -> str:
+def nearest_aspect[A: str](ratio: float, allowed: Sequence[A]) -> A:
     """The allowed "w:h" string closest to `ratio`."""
 
     def value(aspect: str) -> float:

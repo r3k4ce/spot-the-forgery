@@ -94,10 +94,7 @@ def test_api_errors_propagate():
 
 
 SHOWN = [make_image(40, 30, "JPEG") for _ in range(3)]
-CANDIDATES = [
-    Candidate(data=make_image(20 + i, 20, "PNG"), media_type="image/png", model="m")
-    for i in range(3)
-]
+CANDIDATES = [Candidate(data=make_image(20 + i, 20, "PNG"), model="m") for i in range(3)]
 
 
 def scores_by_identity(body: dict[str, Any]) -> dict[str, Any]:

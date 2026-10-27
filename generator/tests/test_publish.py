@@ -28,7 +28,7 @@ def built_round(n: int, score: int) -> BuiltRound:
     )
     group = Group(key=f"artist:{n}", kind="artist", label=f"Painter {n}", paintings=paintings)
     pick = Pick(group=group, shown=paintings[:3], references=paintings[3:], spares=())
-    fake = Candidate(data=make_image(64, 32, "PNG"), media_type="image/png", model="m")
+    fake = Candidate(data=make_image(64, 32, "PNG"), model="m")
     return BuiltRound(
         pick=pick,
         shown_images=tuple(make_image(40, 40) for _ in range(3)),

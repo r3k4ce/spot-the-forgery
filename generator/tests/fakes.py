@@ -76,7 +76,7 @@ class FakeForger:
         if self.calls in self.fail_calls:
             raise RoundFailed("image failed")
         width, height = self.size or (10 + self.calls, 10)
-        return Candidate(data=make_image(width, height, "PNG"), media_type="image/png", model="m")
+        return Candidate(data=make_image(width, height, "PNG"), model="m")
 
 
 @dataclass

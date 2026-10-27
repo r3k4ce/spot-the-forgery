@@ -65,11 +65,7 @@ def test_success_returns_candidate():
     budget = Budget(5)
     gen, _ = generator(lambda body: ok(PNG), budget)
     candidate = gen.generate(BRIEF, REFS)
-    assert (candidate.data, candidate.media_type, candidate.model) == (
-        PNG,
-        "image/png",
-        PRIMARY_MODEL,
-    )
+    assert (candidate.data, candidate.model) == (PNG, PRIMARY_MODEL)
     assert budget.remaining == 4
 
 
@@ -85,11 +81,12 @@ def test_retry_then_fallback():
     assert len(seen) == 3
 
 
-@pytest.mark.parametrize(("fmt", "media_type"), [("JPEG", "image/jpeg"), ("WEBP", "image/webp")])
-def test_jpeg_and_webp_accepted(fmt: str, media_type: str):
+@pytest.mark.parametrize("fmt", ["JPEG", "WEBP"])
+def test_jpeg_and_webp_accepted(fmt: str):
     data = make_image(64, 48, fmt)
-    gen, _ = generator(lambda body: ok(data), Budget(5))
-    assert gen.generate(BRIEF, REFS).media_type == media_type
+    gen, seen = generator(lambda body: ok(data), Budget(5))
+    assert gen.generate(BRIEF, REFS).data == data
+    assert len(seen) == 1
 
 
 def test_svg_or_garbage_counts_as_failure():
