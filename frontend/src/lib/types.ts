@@ -41,4 +41,7 @@ export interface SealedPayload {
 export interface DayResult {
   score: number;
   total: number;
+  // Each round, right or wrong, so the first finish can still be shared after a replay.
+  // Missing from results recorded before it was kept.
+  results?: boolean[];
 }

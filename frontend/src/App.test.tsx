@@ -74,6 +74,7 @@ beforeEach(() => {
   window.location.hash = "";
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   vi.mocked(loadPuzzle).mockImplementation(async (date) => ({
+    status: "ready",
     puzzle: date === OLD_PUZZLE.date ? OLD_PUZZLE : PUZZLE,
     dates: DATES,
   }));
@@ -273,6 +274,46 @@ it("works from the keyboard", async () => {
   expect(confirm).toHaveFocus();
 });
 
+it("keeps keyboard focus with the game as it moves on", async () => {
+  const { user } = await start();
+  await guess(user, 3);
+  expect(screen.getByRole("button", { name: "Next round" })).toHaveFocus();
+  // Moving focus mustn't cost the screen-reader announcement of the answer.
+  expect(liveRegion()).toHaveTextContent("Correct");
+  await user.keyboard("{Enter}");
+  expect(screen.getByRole("heading", { name: ROUND_2 })).toHaveFocus();
+
+  // Guessing from the zoomed view lands in the same place once it closes.
+  await user.click(painting(2));
+  await user.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "This one is the fake" }),
+  );
+  expect(screen.getByRole("button", { name: "See results" })).toHaveFocus();
+  expect(liveRegion()).toHaveTextContent("Not this time");
+  await user.keyboard("{Enter}");
+  expect(screen.getByRole("heading", { name: "Your result" })).toHaveFocus();
+
+  await user.click(screen.getByRole("button", { name: "Play again" }));
+  expect(screen.getByRole("heading", { name: ROUND_1 })).toHaveFocus();
+});
+
+it("leaves focus where the browser puts it on load and after a reload", async () => {
+  const first = await start();
+  expect(document.body).toHaveFocus();
+  await guess(first.user, 3);
+  first.unmount();
+  const reloaded = await start();
+  expect(document.body).toHaveFocus();
+  reloaded.unmount();
+
+  // A finished puzzle opens on the results without grabbing focus either.
+  const progress = { date: "2026-10-26", guesses: [2, 0] };
+  localStorage.setItem("stf:progress:2026-10-26", JSON.stringify(progress));
+  render(<App />);
+  await screen.findByRole("heading", { name: "Your result" });
+  expect(document.body).toHaveFocus();
+});
+
 describe("the zoomed view", () => {
   it("browses between paintings", async () => {
     const { user } = await start();
@@ -411,7 +452,7 @@ describe("the results screen", () => {
     expect(writeText).toHaveBeenCalledWith(expected);
     expect(await screen.findByText("Copied!")).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("stf:history")!)).toEqual({
-      "2026-10-26": { score: 1, total: 2 },
+      "2026-10-26": { score: 1, total: 2, results: [true, false] },
     });
   });
 
@@ -540,8 +581,41 @@ describe("playing again", () => {
     await seeResults(user);
     expect(screen.getByText("2/2")).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("stf:history")!)).toEqual({
-      "2026-10-26": { score: 1, total: 2 },
+      "2026-10-26": { score: 1, total: 2, results: [true, false] },
     });
+  });
+
+  it("shares the first finish, not a better replay", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const { user } = await start();
+    stubClipboard(writeText);
+    await finish(user, 3, 2);
+    expect(screen.queryByText(/Replays don't count/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Play again" }));
+    await guessFile(user, "a3.jpg");
+    await nextRound(user);
+    await guessFile(user, "b1.jpg");
+    await seeResults(user);
+
+    // The replay's own score stays on screen; only what gets shared is the first one.
+    expect(screen.getByText("2/2")).toBeInTheDocument();
+    const expected = `Spot the Forgery #7 🖼️\n🟩🟥 1/2\n${location.href.split("#")[0]}`;
+    expect(screen.getByTestId("share-text")).toHaveTextContent(expected.replace(/\n/g, " "));
+    const note = "Replays don't count: sharing your first score, 1/2.";
+    expect(screen.getByText(note)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Copy result" }));
+    expect(writeText).toHaveBeenCalledWith(expected);
+  });
+
+  it("shares the play on screen for a result recorded without its rounds", async () => {
+    // Results recorded before rounds were kept only have the score.
+    localStorage.setItem("stf:history", JSON.stringify({ "2026-10-26": { score: 1, total: 2 } }));
+    const progress = { date: "2026-10-26", guesses: [2, 0] };
+    localStorage.setItem("stf:progress:2026-10-26", JSON.stringify(progress));
+    render(<App />);
+    expect(await screen.findByTestId("share-text")).toHaveTextContent("🟩🟩 2/2");
+    expect(screen.queryByText(/Replays don't count/)).not.toBeInTheDocument();
   });
 
   it("shuffles the paintings", async () => {
@@ -649,9 +723,17 @@ it("keeps keyboard focus inside the help", async () => {
 });
 
 it("says when there is no puzzle", async () => {
-  vi.mocked(loadPuzzle).mockResolvedValue(null);
+  vi.mocked(loadPuzzle).mockResolvedValue({ status: "missing" });
   render(<App />);
   expect(await screen.findByText("No puzzle yet — check back soon.")).toBeInTheDocument();
+});
+
+it("says when the puzzle couldn't be loaded, rather than that there is none", async () => {
+  vi.mocked(loadPuzzle).mockResolvedValue({ status: "error" });
+  render(<App />);
+  const message = "This puzzle couldn't be opened. Try reloading the page.";
+  expect(await screen.findByText(message)).toBeInTheDocument();
+  expect(screen.queryByText("No puzzle yet — check back soon.")).not.toBeInTheDocument();
 });
 
 it("says when the puzzle can't be opened", async () => {

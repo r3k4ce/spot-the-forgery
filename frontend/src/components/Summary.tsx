@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Ref } from "react";
 import { formatCountdown, score, shareText, type Streaks } from "../lib/game";
 import type { Puzzle, SealedPayload } from "../lib/types";
 import { Review } from "./Review";
@@ -6,6 +6,8 @@ import { Review } from "./Review";
 interface Props {
   puzzle: Puzzle;
   results: boolean[];
+  // The first finish, which is the one that counts; undefined if it was recorded without rounds.
+  firstResults: boolean[] | undefined;
   streaks: Streaks;
   shareUrl: string;
   answers: SealedPayload;
@@ -14,6 +16,8 @@ interface Props {
   // When the next puzzle should appear; null for a past puzzle from the archive.
   nextPuzzle: Date | null;
   onReplay: () => void;
+  // Focused when the player moves on to the results.
+  headingRef?: Ref<HTMLHeadingElement>;
 }
 
 // Its own component so the clock only ticks, once a minute, while a countdown is on screen.
@@ -47,6 +51,7 @@ function copyWithSelection(text: string): boolean {
 export function Summary({
   puzzle,
   results,
+  firstResults,
   streaks,
   shareUrl,
   answers,
@@ -54,9 +59,13 @@ export function Summary({
   imageUrl,
   nextPuzzle,
   onReplay,
+  headingRef,
 }: Props) {
   const [status, setStatus] = useState("");
-  const text = shareText(puzzle.number, results, shareUrl);
+  // A replay can't share a better score than the first finish.
+  const shared = firstResults ?? results;
+  const isReplay = shared.some((ok, i) => ok !== results[i]);
+  const text = shareText(puzzle.number, shared, shareUrl);
   const canShare = typeof navigator.share === "function";
 
   async function copy() {
@@ -82,7 +91,12 @@ export function Summary({
 
   return (
     <section aria-labelledby="summary-title" className="text-center">
-      <h2 id="summary-title" className="font-serif text-2xl">
+      <h2
+        id="summary-title"
+        ref={headingRef}
+        tabIndex={-1}
+        className="font-serif text-2xl focus:outline-none"
+      >
         Your result
       </h2>
       <p className="mt-4 text-5xl font-bold">{`${score(results)}/${results.length}`}</p>
@@ -102,6 +116,11 @@ export function Summary({
       >
         {text}
       </pre>
+      {isReplay && (
+        <p className="mt-4 text-sm text-stone-400">
+          {`Replays don't count: sharing your first score, ${score(shared)}/${shared.length}.`}
+        </p>
+      )}
       <div className="mt-4 flex justify-center gap-3">
         <button
           type="button"

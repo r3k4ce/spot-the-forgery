@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type Ref } from "react";
 import type { PuzzleRound, RoundReveal } from "../lib/types";
 import { Lightbox } from "./Lightbox";
 
@@ -10,6 +10,8 @@ interface Props {
   // painting's own index, so answers still match.
   order?: number[];
   onGuess: (index: number) => void;
+  // Focused when the player moves on to this round.
+  headingRef?: Ref<HTMLHeadingElement>;
 }
 
 function roundTitle(round: PuzzleRound): string {
@@ -18,7 +20,14 @@ function roundTitle(round: PuzzleRound): string {
     : `Four paintings from ${round.label}`;
 }
 
-export function RoundView({ round, imageUrl, reveal, order: shuffled, onGuess }: Props) {
+export function RoundView({
+  round,
+  imageUrl,
+  reveal,
+  order: shuffled,
+  onGuess,
+  headingRef,
+}: Props) {
   // A painting index, as guesses are. Once the answer is shown it is the player's guess,
   // since nothing changes the selection then.
   const [selected, setSelected] = useState<number | null>(null);
@@ -43,7 +52,12 @@ export function RoundView({ round, imageUrl, reveal, order: shuffled, onGuess }:
 
   return (
     <section aria-labelledby="round-title">
-      <h2 id="round-title" className="mb-4 text-center font-serif text-xl sm:text-2xl">
+      <h2
+        id="round-title"
+        ref={headingRef}
+        tabIndex={-1}
+        className="mb-4 text-center font-serif text-xl focus:outline-none sm:text-2xl"
+      >
         {roundTitle(round)}
       </h2>
 

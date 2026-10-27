@@ -58,6 +58,16 @@ it("drops malformed history entries", () => {
   expect(loadHistory()).toEqual({});
 });
 
+it("keeps each round's result with the score, and the score alone if they're malformed", () => {
+  recordResult("2026-10-26", { score: 1, total: 2, results: [true, false] });
+  expect(loadHistory()["2026-10-26"]).toEqual({ score: 1, total: 2, results: [true, false] });
+  localStorage.setItem(
+    "stf:history",
+    JSON.stringify({ "2026-10-26": { score: 1, total: 2, results: ["yes", 0] } }),
+  );
+  expect(loadHistory()).toEqual({ "2026-10-26": { score: 1, total: 2 } });
+});
+
 it("remembers that the help was seen", () => {
   expect(hasSeenHelp()).toBe(false);
   markHelpSeen();
