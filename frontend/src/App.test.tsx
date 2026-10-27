@@ -289,6 +289,20 @@ describe("the zoomed view", () => {
     expect(within(screen.getAllByRole("figure")[1]).getByText("Your guess")).toBeInTheDocument();
   });
 
+  it("doesn't take a two-finger pinch for a swipe", async () => {
+    const { user } = await start();
+    await user.click(painting(1));
+    const dialog = screen.getByRole("dialog");
+    const left = { clientX: 200, clientY: 300 };
+    const right = { clientX: 220, clientY: 300 };
+    fireEvent.touchStart(dialog, { touches: [left] });
+    fireEvent.touchStart(dialog, { touches: [left, right] });
+    // The fingers spread apart, then lift one at a time.
+    fireEvent.touchEnd(dialog, { touches: [left], changedTouches: [{ ...right, clientX: 400 }] });
+    fireEvent.touchEnd(dialog, { touches: [], changedTouches: [{ ...left, clientX: 20 }] });
+    expect(dialog).toHaveAccessibleName("Painting 1 of 4");
+  });
+
   it("can guess from the zoomed view", async () => {
     const { user } = await start();
     await user.click(painting(3));

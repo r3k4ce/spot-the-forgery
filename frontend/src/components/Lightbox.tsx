@@ -43,7 +43,8 @@ export function Lightbox({ src, alt, onClose, onChoose, onPrev, onNext }: Props)
         if (e.target === e.currentTarget) onClose();
       }}
       onTouchStart={(e) => {
-        const t = e.touches[0];
+        // A second finger makes it a pinch, not a swipe, until every finger has lifted.
+        const t = e.touches.length === 1 ? e.touches[0] : undefined;
         touchStart.current = t ? { x: t.clientX, y: t.clientY } : null;
       }}
       onTouchEnd={(e) => {
