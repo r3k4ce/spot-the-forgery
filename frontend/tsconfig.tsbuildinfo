@@ -1,1 +1,1 @@
-{"root":["./src/main.tsx","./src/lib/game.test.ts","./src/lib/game.ts","./src/lib/seal.test.ts","./src/lib/seal.ts","./src/lib/types.ts","./src/test/setup.ts","./vite.config.ts"],"version":"5.9.3"}
+{"root":["./src/main.tsx","./src/lib/game.test.ts","./src/lib/game.ts","./src/lib/load.test.ts","./src/lib/load.ts","./src/lib/seal.test.ts","./src/lib/seal.ts","./src/lib/storage.test.ts","./src/lib/storage.ts","./src/lib/types.ts","./src/test/setup.ts","./vite.config.ts"],"version":"5.9.3"}
