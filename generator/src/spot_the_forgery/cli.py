@@ -18,7 +18,7 @@ from spot_the_forgery.forger import ForgerUnavailable, OpenRouterImageGenerator
 from spot_the_forgery.models import Group
 from spot_the_forgery.picker import day_rng
 from spot_the_forgery.pipeline import DayFailed, Deps, build_day
-from spot_the_forgery.publish import load_history, load_index, publish_day
+from spot_the_forgery.publish import load_history, load_index, publish_day, puzzle_dir
 
 REQUIRED_ENV = ("ANTHROPIC_API_KEY", "OPENROUTER_API_KEY")
 
@@ -48,6 +48,10 @@ def run_generate(
         day = today + timedelta(days=offset)
         if day.isoformat() in published:
             continue
+        if puzzle_dir(puzzles_dir, day).exists():
+            # publish_day would refuse it, so building it would only waste paid images.
+            log.error("%s has a puzzle folder but is not in the index", day)
+            return 1
         if not budget.can_start_day():
             log.info("budget too low to start %s (%d left); stopping", day, budget.remaining)
             return 0

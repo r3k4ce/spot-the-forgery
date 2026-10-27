@@ -71,6 +71,14 @@ def test_mid_day_budget_exhaustion_fails(tmp_path: Path):
     assert not any(tmp_path.iterdir()) or not (tmp_path / "2026-10-26").exists()
 
 
+def test_unindexed_folder_fails_before_spending(tmp_path: Path):
+    # publish_day refuses to overwrite a folder, so building the day would only waste images.
+    (tmp_path / "2026-10-26").mkdir()
+    forger = FakeForger()
+    assert run(tmp_path, Budget(30), days_ahead=0, forger=forger) == 1
+    assert forger.calls == 0
+
+
 def test_day_failed_returns_1(tmp_path: Path):
     brief = FakeBriefWriter(fail_groups={g.key for g in GROUPS})
     assert run(tmp_path, Budget(30), days_ahead=0, brief=brief) == 1

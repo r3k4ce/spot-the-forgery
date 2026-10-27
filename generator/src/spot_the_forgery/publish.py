@@ -89,10 +89,14 @@ def _round_files(
     return files, public, reveal
 
 
+def puzzle_dir(puzzles_dir: Path, day: date) -> Path:
+    return puzzles_dir / day.isoformat()
+
+
 def publish_day(
     puzzles_dir: Path, day: date, rounds: Sequence[BuiltRound], rng: random.Random
 ) -> Path:
-    final = puzzles_dir / day.isoformat()
+    final = puzzle_dir(puzzles_dir, day)
     if final.exists():
         raise FileExistsError(f"puzzle for {day} already published")
     tmp = puzzles_dir / f".tmp-{day.isoformat()}"
