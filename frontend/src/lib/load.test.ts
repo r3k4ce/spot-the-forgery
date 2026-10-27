@@ -39,11 +39,26 @@ describe("loadPuzzle", () => {
 
   it("fetches only today's puzzle when future dates are listed", async () => {
     const { fn, calls } = stubFetch({
-      "./puzzles/index.json": ["2026-10-26", "2026-10-27", "2026-10-28"],
+      "./puzzles/index.json": ["2026-10-19", "2026-10-26", "2026-10-27", "2026-10-28"],
       "./puzzles/2026-10-26/puzzle.json": puzzle,
     });
-    expect(await loadPuzzle("./", NOW, fn)).toEqual(puzzle);
+    expect(await loadPuzzle("./", NOW, fn)).toEqual({
+      puzzle,
+      dates: ["2026-10-19", "2026-10-26"],
+    });
     expect(calls).toEqual(["./puzzles/index.json", "./puzzles/2026-10-26/puzzle.json"]);
+  });
+
+  it("shows the latest earlier puzzle between weekly dates", async () => {
+    const earlier = { ...puzzle, date: "2026-10-19" };
+    const { fn } = stubFetch({
+      "./puzzles/index.json": ["2026-10-12", "2026-10-19", "2026-11-02"],
+      "./puzzles/2026-10-19/puzzle.json": earlier,
+    });
+    expect(await loadPuzzle("./", NOW, fn)).toEqual({
+      puzzle: earlier,
+      dates: ["2026-10-12", "2026-10-19"],
+    });
   });
 
   it("resolves null when the network fails", async () => {

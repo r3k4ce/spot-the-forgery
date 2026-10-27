@@ -30,7 +30,7 @@ export function Summary({ puzzle, results, streaks, shareUrl }: Props) {
   return (
     <section aria-labelledby="summary-title" className="text-center">
       <h2 id="summary-title" className="font-serif text-2xl">
-        Today's result
+        Your result
       </h2>
       <p className="mt-4 text-5xl font-bold">{`${score(results)}/${results.length}`}</p>
       <dl className="mt-6 flex justify-center gap-10">

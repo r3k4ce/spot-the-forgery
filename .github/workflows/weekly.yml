@@ -1,20 +1,17 @@
-name: Daily puzzles
+name: Weekly puzzle
 
-# Manual only: every run spends OpenRouter credits. Add a schedule trigger to run it daily.
+# One new puzzle every Monday; the site shows it until the next one. Each run spends
+# OpenRouter credits (about $0.14, at most $0.27), so there is no manual trigger.
 on:
-  workflow_dispatch:
-    inputs:
-      max_images:
-        description: Image budget for this run
-        required: false
-        default: "30"
+  schedule:
+    - cron: "0 3 * * 1"
 
 permissions:
   contents: write
 
-# Two runs must never generate the same dates at once.
+# Two runs must never generate the same date at once.
 concurrency:
-  group: daily-generate
+  group: weekly-generate
   cancel-in-progress: false
 
 jobs:
@@ -36,8 +33,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MAX_IMAGES: ${{ inputs.max_images || 30 }}
-        run: uv run --locked stf generate --max-images "$MAX_IMAGES"
+        run: uv run --locked stf generate --days-ahead 0 --max-images 30
 
       # Days finished before a failure are still worth publishing.
       - name: Commit new puzzles

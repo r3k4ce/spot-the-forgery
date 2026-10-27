@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { RoundView } from "./components/RoundView";
 import { Summary } from "./components/Summary";
 import { computeStreaks, score } from "./lib/game";
-import { loadPuzzle, todayUtc } from "./lib/load";
+import { loadPuzzle } from "./lib/load";
 import { unseal } from "./lib/seal";
 import { loadHistory, loadProgress, recordResult, saveProgress } from "./lib/storage";
 import type { Puzzle, SealedPayload } from "./lib/types";
@@ -13,7 +13,7 @@ type Load =
   | { status: "loading" }
   | { status: "missing" }
   | { status: "error" }
-  | { status: "ready"; puzzle: Puzzle; answers: SealedPayload };
+  | { status: "ready"; puzzle: Puzzle; dates: string[]; answers: SealedPayload };
 
 export default function App() {
   const [load, setLoad] = useState<Load>({ status: "loading" });
@@ -23,15 +23,16 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const puzzle = await loadPuzzle(BASE);
+      const loaded = await loadPuzzle(BASE);
       if (cancelled) return;
-      if (!puzzle) return setLoad({ status: "missing" });
+      if (!loaded) return setLoad({ status: "missing" });
+      const { puzzle, dates } = loaded;
       try {
         // Answers stay hidden in state until each round is guessed.
         const answers = await unseal(puzzle.sealed, puzzle.date);
         if (cancelled) return;
         setGuesses(loadProgress(puzzle.date).guesses.slice(0, puzzle.rounds.length));
-        setLoad({ status: "ready", puzzle, answers });
+        setLoad({ status: "ready", puzzle, dates, answers });
       } catch {
         if (!cancelled) setLoad({ status: "error" });
       }
@@ -54,14 +55,15 @@ export default function App() {
         <main className="flex-1">
           {load.status === "loading" && <p className="text-center text-stone-400">Loading…</p>}
           {load.status === "missing" && (
-            <p className="text-center">No puzzle today — check back soon.</p>
+            <p className="text-center">No puzzle yet — check back soon.</p>
           )}
           {load.status === "error" && (
-            <p className="text-center">Today's puzzle couldn't be opened. Try reloading the page.</p>
+            <p className="text-center">This puzzle couldn't be opened. Try reloading the page.</p>
           )}
           {load.status === "ready" && (
             <Game
               puzzle={load.puzzle}
+              dates={load.dates}
               answers={load.answers}
               guesses={guesses}
               revealing={revealing}
@@ -92,6 +94,7 @@ export default function App() {
 
 interface GameProps {
   puzzle: Puzzle;
+  dates: string[];
   answers: SealedPayload;
   guesses: number[];
   revealing: boolean;
@@ -99,7 +102,7 @@ interface GameProps {
   onNext: () => void;
 }
 
-function Game({ puzzle, answers, guesses, revealing, onGuess, onNext }: GameProps) {
+function Game({ puzzle, dates, answers, guesses, revealing, onGuess, onNext }: GameProps) {
   const total = puzzle.rounds.length;
   if (guesses.length >= total && !revealing) {
     const results = guesses.map((g, i) => g === answers.rounds[i]?.fakeIndex);
@@ -107,7 +110,7 @@ function Game({ puzzle, answers, guesses, revealing, onGuess, onNext }: GameProp
       <Summary
         puzzle={puzzle}
         results={results}
-        streaks={computeStreaks(loadHistory(), todayUtc(new Date()))}
+        streaks={computeStreaks(loadHistory(), dates)}
         shareUrl={location.href.split("#")[0]}
       />
     );

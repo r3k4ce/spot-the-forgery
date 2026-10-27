@@ -1,7 +1,5 @@
 import type { DayResult } from "./types";
 
-const DAY_MS = 86_400_000;
-
 export function score(results: boolean[]): number {
   return results.filter(Boolean).length;
 }
@@ -11,26 +9,24 @@ export function shareText(number: number, results: boolean[], url: string): stri
   return `Spot the Forgery #${number} 🖼️\n${squares} ${score(results)}/${results.length}\n${url}`;
 }
 
-function dayNumber(iso: string): number {
-  return Math.round(Date.parse(`${iso}T00:00:00Z`) / DAY_MS);
-}
-
+// Streaks count consecutive published puzzles, so a weekly puzzle keeps them going.
 export function computeStreaks(
   history: Record<string, DayResult>,
-  today: string,
+  dates: string[],
 ): { current: number; best: number } {
-  const days = new Set(Object.keys(history).map(dayNumber));
-  const runLength = (end: number) => {
+  const played = dates.map((d) => d in history);
+  const runEndingAt = (end: number) => {
     let n = 0;
-    while (days.has(end - n)) n++;
+    while (end - n >= 0 && played[end - n]) n++;
     return n;
   };
 
   let best = 0;
-  for (const d of days) {
-    if (!days.has(d + 1)) best = Math.max(best, runLength(d));
-  }
-  const t = dayNumber(today);
-  const current = days.has(t) ? runLength(t) : runLength(t - 1);
+  played.forEach((p, i) => {
+    if (p && !played[i + 1]) best = Math.max(best, runEndingAt(i));
+  });
+  const last = dates.length - 1;
+  // The latest puzzle not being played yet doesn't break the run before it.
+  const current = played[last] ? runEndingAt(last) : runEndingAt(last - 1);
   return { current, best };
 }

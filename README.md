@@ -1,24 +1,23 @@
 # Spot the Forgery
 
-A daily web game: three real museum paintings and one AI forgery. Spot the fake.
+A weekly web game: three real museum paintings and one AI forgery. Spot the fake.
 
-Each day has five rounds. Every round shows four paintings from one group, either a named
+Each puzzle has five rounds. Every round shows four paintings from one group, either a named
 artist or an anonymous culture and century. Three are real public-domain (CC0) paintings from
 the [Cleveland Museum of Art Open Access](https://openaccess-api.clevelandart.org/) collection,
-and one is an AI forgery made in the same style. Rounds get harder as the day goes on.
+and one is an AI forgery made in the same style. Rounds get harder as the puzzle goes on.
 
 ## How it works
 
 - `generator/` is a Python package (the `stf` command). It picks groups from the museum
   catalog, has Claude write an image brief from three reference paintings, generates three
   forgery candidates through OpenRouter, has Claude judge which is most convincing, and writes
-  the day's puzzle into `frontend/public/puzzles/<date>/`. The answers in `puzzle.json` are
+  each puzzle into `frontend/public/puzzles/<date>/`. The answers in `puzzle.json` are
   lightly obfuscated, not encrypted.
-- `frontend/` is a static Vite + React site that reads those files. Puzzles change at
-  midnight UTC.
-- GitHub Actions builds puzzles for today through today + 3 when you run the Daily puzzles
-  workflow by hand, commits them and redeploys GitHub Pages. On a date with no puzzle of its
-  own, the site shows the most recent one.
+- `frontend/` is a static Vite + React site that reads those files. It shows the most recent
+  puzzle dated today or earlier (UTC), and streaks count consecutive puzzles.
+- GitHub Actions (`weekly.yml`) builds one new puzzle every Monday at 03:00 UTC, commits it
+  and redeploys GitHub Pages. There is no manual trigger.
 
 ## Local setup
 
@@ -55,14 +54,11 @@ the budget ran out on today's date, `2` missing API keys.
 1. Add two repository secrets under **Settings → Secrets and variables → Actions**:
    `ANTHROPIC_API_KEY` and `OPENROUTER_API_KEY`.
 2. Under **Settings → Pages**, set **Source** to **GitHub Actions**.
-3. Push to `main`. `pages.yml` deploys the site. `daily.yml` runs only when you start it from
-   the Actions tab (**Daily puzzles → Run workflow**, with an optional image budget). To make
-   it run every day, add `schedule: [{cron: "0 3 * * *"}]` under its `on:` key.
+3. Push to `main`. `pages.yml` deploys the site; `weekly.yml` adds a puzzle every Monday.
 
-Each run costs at most $0.27 on OpenRouter (the default 30-image cap). One date takes 15
-FLUX 3 Klein images at $0.009 each, about $0.14; a daily schedule would come to about $4 a
-month. The Claude calls run on
-the Anthropic API key and aren't counted here. Measured on the first live dry run
+Each weekly run costs about $0.14 on OpenRouter (15 FLUX 3 Klein images at $0.009) and at most
+$0.27 (its 30-image cap), so roughly $0.60 a month. The Claude calls run on the Anthropic API
+key and aren't counted here. Measured on the first live dry run
 (2026-10-27): 15 images, all from FLUX 3 Klein, $0.135 in total.
 
 ## Credits

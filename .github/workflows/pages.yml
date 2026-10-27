@@ -19,7 +19,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Always build main, so a call from daily.yml includes the puzzles it just pushed.
+      # Always build main, so a call from weekly.yml includes the puzzles it just pushed.
       - uses: actions/checkout@v6
         with:
           ref: main

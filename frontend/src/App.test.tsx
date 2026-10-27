@@ -60,7 +60,7 @@ const REVEAL: SealedPayload = {
 
 beforeEach(() => {
   localStorage.clear();
-  vi.mocked(loadPuzzle).mockResolvedValue(PUZZLE);
+  vi.mocked(loadPuzzle).mockResolvedValue({ puzzle: PUZZLE, dates: ["2026-10-19", "2026-10-26"] });
   vi.mocked(unseal).mockResolvedValue(REVEAL);
 });
 
@@ -154,6 +154,18 @@ it("shows the score and shares to the clipboard", async () => {
   });
 });
 
+it("counts the streak across weekly puzzles", async () => {
+  localStorage.setItem("stf:history", JSON.stringify({ "2026-10-19": { score: 4, total: 5 } }));
+  const { user } = await start();
+  await guess(user, 3);
+  await user.click(screen.getByRole("button", { name: "Next round" }));
+  await guess(user, 1);
+  await user.click(screen.getByRole("button", { name: "See results" }));
+  expect(screen.getByText("Your result")).toBeInTheDocument();
+  const current = screen.getByText("Current streak").nextElementSibling;
+  expect(current).toHaveTextContent("2");
+});
+
 it("restores progress after a reload", async () => {
   const { user, unmount } = await start();
   await guess(user, 1);
@@ -184,7 +196,7 @@ it("works from the keyboard", async () => {
 it("says when there is no puzzle", async () => {
   vi.mocked(loadPuzzle).mockResolvedValue(null);
   render(<App />);
-  expect(await screen.findByText("No puzzle today — check back soon.")).toBeInTheDocument();
+  expect(await screen.findByText("No puzzle yet — check back soon.")).toBeInTheDocument();
 });
 
 it("credits the museum in the footer", async () => {
