@@ -5,9 +5,10 @@ interface Props {
   src: string;
   alt: string;
   onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  // Only while guessing: picks the painting on screen as the fake.
   onChoose?: () => void;
-  onPrev?: () => void;
-  onNext?: () => void;
 }
 
 // A horizontal drag at least this long, and mostly sideways, counts as a swipe.
@@ -25,8 +26,8 @@ export function Lightbox({ src, alt, onClose, onChoose, onPrev, onNext }: Props)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") onPrev?.();
-      else if (e.key === "ArrowRight") onNext?.();
+      if (e.key === "ArrowLeft") onPrev();
+      else if (e.key === "ArrowRight") onNext();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -39,9 +40,6 @@ export function Lightbox({ src, alt, onClose, onChoose, onPrev, onNext }: Props)
       aria-modal="true"
       aria-label={alt}
       className="fixed inset-0 z-50 flex flex-col bg-black"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
       onTouchStart={(e) => {
         // A second finger makes it a pinch, not a swipe, until every finger has lifted.
         const t = e.touches.length === 1 ? e.touches[0] : undefined;
@@ -55,21 +53,17 @@ export function Lightbox({ src, alt, onClose, onChoose, onPrev, onNext }: Props)
         if (!start || !t || actualSize) return;
         const dx = t.clientX - start.x;
         if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(t.clientY - start.y)) return;
-        if (dx < 0) onNext?.();
-        else onPrev?.();
+        if (dx < 0) onNext();
+        else onPrev();
       }}
     >
       <div className="flex flex-wrap justify-end gap-2 p-3">
-        {onPrev && (
-          <button type="button" onClick={onPrev} className={BUTTON} aria-label="Previous painting">
-            ←
-          </button>
-        )}
-        {onNext && (
-          <button type="button" onClick={onNext} className={BUTTON} aria-label="Next painting">
-            →
-          </button>
-        )}
+        <button type="button" onClick={onPrev} className={BUTTON} aria-label="Previous painting">
+          ←
+        </button>
+        <button type="button" onClick={onNext} className={BUTTON} aria-label="Next painting">
+          →
+        </button>
         <button type="button" onClick={() => setActualSize((v) => !v)} className={BUTTON}>
           {actualSize ? "Fit to screen" : "Actual size"}
         </button>
