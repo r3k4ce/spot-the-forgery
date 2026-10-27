@@ -59,6 +59,12 @@ def test_stops_cleanly_when_budget_low(tmp_path: Path):
     assert load_index(tmp_path) == ["2026-10-26"]
 
 
+def test_budget_running_out_on_a_future_date_stops_cleanly(tmp_path: Path):
+    # Today takes 15 images; tomorrow starts with 15 left but a refused prompt eats them.
+    assert run(tmp_path, Budget(30), days_ahead=1, forger=FakeForger(budget_after=20)) == 0
+    assert load_index(tmp_path) == ["2026-10-26"]
+
+
 def test_mid_day_budget_exhaustion_fails(tmp_path: Path):
     assert run(tmp_path, Budget(30), days_ahead=0, forger=FakeForger(budget_after=4)) == 1
     assert load_index(tmp_path) == []

@@ -53,7 +53,14 @@ def run_generate(
             return 0
         try:
             rounds = build_day(groups, load_history(puzzles_dir, day), day_rng(day), deps)
-        except (BudgetExceeded, DayFailed, ForgerUnavailable) as exc:
+        except BudgetExceeded:
+            if day == today:
+                log.error("could not build %s: image budget ran out", day)
+                return 1
+            # A future date has later runs to finish it; nothing partial was published.
+            log.warning("image budget ran out while building %s; stopping", day)
+            return 0
+        except (DayFailed, ForgerUnavailable) as exc:
             log.error("could not build %s: %s", day, exc)
             return 1
         publish_day(puzzles_dir, day, rounds, day_rng(day))

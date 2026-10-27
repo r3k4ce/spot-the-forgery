@@ -45,8 +45,9 @@ below set in the environment.
 `STF_JUDGE_MODEL` overrides the Claude model used for briefs and judging (default
 `claude-haiku-5-5`).
 
-Exit codes: `0` success (including stopping early because the image budget ran low), `1` a day
-could not be built, `2` missing API keys.
+Exit codes: `0` success (including stopping early because the image budget ran low, even
+partway through a future date, which a later run finishes), `1` a day could not be built or
+the budget ran out on today's date, `2` missing API keys.
 
 ## Deploying
 
