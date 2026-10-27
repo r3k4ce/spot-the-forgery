@@ -40,7 +40,7 @@ below set in the environment.
 
 | Command | What it does |
 | --- | --- |
-| `uv run stf generate` | Builds any missing puzzles for today through today + 3 into `../frontend/public/puzzles`. Options: `--days-ahead 3`, `--max-images 30`, `--today YYYY-MM-DD`, `--puzzles-dir`, `--catalog`. |
+| `uv run stf generate` | Builds today's puzzle into `../frontend/public/puzzles` if it is missing. Options: `--days-ahead N` (also build the next N days, default 0), `--max-images 30`, `--today YYYY-MM-DD`, `--puzzles-dir`, `--catalog`. |
 | `uv run stf dry-run --date YYYY-MM-DD --out DIR` | Builds one date into a scratch folder (budget 15 images) so you can look at it before going live. |
 | `uv run stf refresh-catalog` | Re-downloads the museum catalog into `data/catalog.json`. No API keys needed. `generate` refreshes it automatically when it is older than 7 days. |
 
@@ -49,7 +49,8 @@ below set in the environment.
 
 Exit codes: `0` success (including stopping early because the image budget ran low, even
 partway through a future date, which a later run finishes), `1` a day could not be built or
-the budget ran out on today's date, `2` missing API keys.
+the budget ran out on today's date, or OpenRouter refused the account (bad key, no credits, a
+spent limit), `2` missing API keys. A prompt OpenRouter flags or refuses only fails that attempt.
 
 ## Deploying
 
