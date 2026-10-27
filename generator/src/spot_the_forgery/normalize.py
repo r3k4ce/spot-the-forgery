@@ -1,10 +1,13 @@
 """Make real and forged images indistinguishable by their file properties."""
 
 import io
+import logging
 import random
 from collections.abc import Sequence
 
 from PIL import Image, ImageCms
+
+log = logging.getLogger(__name__)
 
 LONG_EDGE = 1024
 JPEG_QUALITY = 85
@@ -73,6 +76,18 @@ def crop_to_aspect(data: bytes, ratio: float) -> bytes:
     return out.getvalue()
 
 
+def _to_srgb(img: Image.Image, icc: bytes) -> Image.Image:
+    try:
+        source = ImageCms.ImageCmsProfile(io.BytesIO(icc))
+        converted = ImageCms.profileToProfile(img, source, _SRGB, outputMode="RGB")
+    except (OSError, ImageCms.PyCMSError) as exc:
+        # A broken or mismatched profile must not sink a day whose images are already
+        # paid for; the pixels are most likely sRGB anyway.
+        log.warning("ignoring unusable colour profile: %s", exc)
+        return img
+    return converted if converted is not None else img
+
+
 def _flatten_to_srgb(img: Image.Image) -> Image.Image:
     """Plain sRGB pixels, with any transparency laid over white."""
     icc = img.info.get("icc_profile")
@@ -82,9 +97,7 @@ def _flatten_to_srgb(img: Image.Image) -> Image.Image:
     alpha = img.getchannel("A") if img.mode in ("RGBA", "LA") else None
     colour = img.convert(img.mode[:-1]) if alpha is not None else img
     if icc:
-        source = ImageCms.ImageCmsProfile(io.BytesIO(icc))
-        converted = ImageCms.profileToProfile(colour, source, _SRGB, outputMode="RGB")
-        colour = converted if converted is not None else colour
+        colour = _to_srgb(colour, icc)
     colour = colour.convert("RGB")
     if alpha is None:
         return colour

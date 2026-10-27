@@ -82,6 +82,20 @@ def test_transparency_is_flattened_the_same_with_a_colour_profile():
     assert all(abs(a - b) <= 2 for a, b in zip(plain_px, profiled_px, strict=True))
 
 
+@pytest.mark.parametrize(
+    ("mode", "fmt", "profile"),
+    [
+        ("P", "PNG", ImageCms.createProfile("sRGB")),  # describes the palette's colours
+        ("RGB", "JPEG", ImageCms.createProfile("LAB")),  # wrong colour space for the pixels
+        ("RGB", "JPEG", None),  # not a profile at all
+    ],
+)
+def test_unusable_colour_profile_is_ignored(mode: str, fmt: str, profile):
+    icc = ImageCms.ImageCmsProfile(profile).tobytes() if profile else b"not a profile"
+    img = _open(normalize(make_image(40, 30, fmt, mode, icc_profile=icc)))
+    assert (img.format, img.mode) == ("JPEG", "RGB")
+
+
 def test_random_name_deterministic_and_shape():
     a = random_name(random.Random(1))
     assert a == random_name(random.Random(1))
