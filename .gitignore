@@ -11,3 +11,5 @@ frontend/dist/
 .superpowers/
 frontend/coverage/
 frontend/tsconfig.tsbuildinfo
+docs/
+.claude/worktrees/

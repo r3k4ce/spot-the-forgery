@@ -67,3 +67,8 @@ key and aren't counted here. Measured on the first live dry run
 
 Real paintings: Cleveland Museum of Art Open Access (CC0). Forgeries are AI-generated for this
 game.
+
+## License
+
+The code is under the [MIT License](LICENSE). The museum paintings are CC0 and are not covered
+by it.

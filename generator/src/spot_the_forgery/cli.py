@@ -98,7 +98,7 @@ def _http_client() -> httpx.Client:
     return httpx.Client(
         transport=httpx.HTTPTransport(retries=3),
         timeout=30,
-        headers={"User-Agent": "spot-the-forgery/0.1 (daily puzzle generator)"},
+        headers={"User-Agent": "spot-the-forgery/0.1 (weekly puzzle generator)"},
         follow_redirects=True,
     )
 

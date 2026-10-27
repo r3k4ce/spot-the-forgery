@@ -1,7 +1,8 @@
 [project]
 name = "spot-the-forgery"
 version = "0.1.0"
-description = "Daily puzzle generator for Spot the Forgery"
+description = "Weekly puzzle generator for Spot the Forgery"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic==2.3.0",
