@@ -82,7 +82,15 @@ export function Lightbox({ src, alt, onClose, onPrev, onNext, returnFocus, onCho
           Close
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+      {/* At actual size the painting can be scrolled, so the keyboard needs to reach it. */}
+      <div
+        className="min-h-0 flex-1 overflow-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-amber-400"
+        {...(actualSize && {
+          tabIndex: 0,
+          role: "region",
+          "aria-label": "Painting at actual size",
+        })}
+      >
         <img
           src={src}
           alt={alt}

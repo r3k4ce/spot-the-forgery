@@ -380,6 +380,16 @@ describe("the zoomed view", () => {
     await user.click(within(dialog).getByRole("button", { name: "Actual size" }));
     expect(within(dialog).getByRole("button", { name: "Fit to screen" })).toBeInTheDocument();
   });
+
+  it("lets the keyboard reach the painting at actual size, to scroll it", async () => {
+    const { user } = await start();
+    await user.click(painting(1));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Actual size" }));
+    within(dialog).getByRole("button", { name: "Close" }).focus();
+    await user.tab();
+    expect(within(dialog).getByRole("region", { name: "Painting at actual size" })).toHaveFocus();
+  });
 });
 
 describe("the results screen", () => {
