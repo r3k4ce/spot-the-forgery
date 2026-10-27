@@ -382,15 +382,50 @@ describe("the results screen", () => {
     expect(await screen.findByText("Copied!")).toBeInTheDocument();
   });
 
-  it("uses the native share sheet when available", async () => {
-    const share = vi.fn().mockResolvedValue(undefined);
+  it("says so when the result can't be copied at all", async () => {
+    const { user } = await start();
+    stubClipboard(vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError")));
+    const execCommand = vi.fn().mockReturnValue(false);
+    Object.defineProperty(document, "execCommand", { value: execCommand, configurable: true });
+    await finish(user, 3, 1);
+
+    await user.click(screen.getByRole("button", { name: "Copy result" }));
+    expect(await screen.findByText("Couldn't copy — select the text above.")).toBeInTheDocument();
+  });
+
+  // Opens the results of a finished puzzle with a share sheet that answers with `outcome`.
+  async function shareFinished(outcome: () => Promise<void>) {
+    const share = vi.fn(outcome);
     Object.defineProperty(navigator, "share", { value: share, configurable: true });
     const progress = { date: "2026-10-26", guesses: [2, 0] };
     localStorage.setItem("stf:progress:2026-10-26", JSON.stringify(progress));
     const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    stubClipboard(writeText);
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Share" }));
+    return { share, writeText };
+  }
+
+  it("uses the native share sheet when available", async () => {
+    const { share, writeText } = await shareFinished(async () => {});
     expect(share).toHaveBeenCalledWith({ text: expect.stringContaining("🟩🟩 2/2") });
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("does nothing more when the share sheet is dismissed", async () => {
+    const { writeText } = await shareFinished(async () => {
+      throw new DOMException("", "AbortError");
+    });
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("copies the result when the share sheet fails", async () => {
+    const { writeText } = await shareFinished(async () => {
+      throw new TypeError("unsupported");
+    });
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("🟩🟩 2/2"));
+    expect(await screen.findByText("Copied!")).toBeInTheDocument();
   });
 
   it("counts down to the next puzzle, for the latest puzzle only", async () => {
@@ -494,6 +529,14 @@ describe("the archive", () => {
     expect(window.scrollTo).toHaveBeenCalledWith(0, 0);
   });
 
+  it("marks a puzzle that was started but not finished", async () => {
+    const { user } = await start();
+    await guess(user, 3);
+    await user.click(screen.getByRole("link", { name: "Archive" }));
+    const items = await screen.findAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Puzzle #2 · 2026-10-26In progress");
+  });
+
   it("opens a past puzzle and comes back", async () => {
     const { user } = await start();
     const title = (name: string) => screen.findByRole("heading", { level: 1, name });
@@ -555,6 +598,13 @@ it("says when there is no puzzle", async () => {
   vi.mocked(loadPuzzle).mockResolvedValue(null);
   render(<App />);
   expect(await screen.findByText("No puzzle yet — check back soon.")).toBeInTheDocument();
+});
+
+it("says when the puzzle can't be opened", async () => {
+  vi.mocked(unseal).mockRejectedValue(new SyntaxError("garbled"));
+  render(<App />);
+  const message = "This puzzle couldn't be opened. Try reloading the page.";
+  expect(await screen.findByText(message)).toBeInTheDocument();
 });
 
 it("credits the museum in the footer", async () => {
