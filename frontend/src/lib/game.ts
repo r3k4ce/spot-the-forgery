@@ -22,21 +22,12 @@ export interface Streaks {
 
 // Streaks count consecutive published puzzles, so a weekly puzzle keeps them going.
 export function computeStreaks(history: History, dates: string[]): Streaks {
-  const played = dates.map((d) => d in history);
-  const runEndingAt = (end: number) => {
-    let n = 0;
-    while (end - n >= 0 && played[end - n]) n++;
-    return n;
-  };
-
-  let best = 0;
-  played.forEach((p, i) => {
-    if (p && !played[i + 1]) best = Math.max(best, runEndingAt(i));
-  });
-  const last = dates.length - 1;
+  // The length of the run of played puzzles ending at each date.
+  const runs: number[] = [];
+  for (const date of dates) runs.push(date in history ? (runs.at(-1) ?? 0) + 1 : 0);
   // The latest puzzle not being played yet doesn't break the run before it.
-  const current = played[last] ? runEndingAt(last) : runEndingAt(last - 1);
-  return { current, best };
+  const current = runs.at(-1) || (runs.at(-2) ?? 0);
+  return { current, best: Math.max(0, ...runs) };
 }
 
 const DAY_MS = 86_400_000;
