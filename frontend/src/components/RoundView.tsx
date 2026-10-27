@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { PuzzleRound, RoundReveal } from "../lib/types";
 import { Lightbox } from "./Lightbox";
 
@@ -24,6 +24,8 @@ export function RoundView({ round, imageUrl, reveal, order: shuffled, onGuess }:
   const [selected, setSelected] = useState<number | null>(null);
   // A position on screen, not a painting index.
   const [zoomed, setZoomed] = useState<number | null>(null);
+  // The painting buttons by position, to put focus back on the one last shown zoomed.
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const order = shuffled ?? round.images.map((_, i) => i);
   const count = order.length;
   const alt = (position: number) => `Painting ${position + 1} of ${count}`;
@@ -60,6 +62,9 @@ export function RoundView({ round, imageUrl, reveal, order: shuffled, onGuess }:
           return (
             <figure key={file} className="m-0">
               <button
+                ref={(el) => {
+                  buttons.current[position] = el;
+                }}
                 type="button"
                 aria-label={alt(position)}
                 aria-pressed={reveal ? undefined : selected === i}
@@ -136,6 +141,7 @@ export function RoundView({ round, imageUrl, reveal, order: shuffled, onGuess }:
           onClose={() => setZoomed(null)}
           onPrev={() => browse(-1)}
           onNext={() => browse(1)}
+          returnFocus={() => buttons.current[zoomed]}
           onChoose={
             reveal
               ? undefined

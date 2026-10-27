@@ -7,6 +7,8 @@ interface Props {
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
+  // Where focus goes on closing, if not back to what opened the zoomed view.
+  returnFocus?: () => HTMLElement | null | undefined;
   // Only while guessing: picks the painting on screen as the fake.
   onChoose?: () => void;
 }
@@ -17,12 +19,12 @@ const SWIPE_PX = 50;
 const BUTTON =
   "rounded border border-stone-600 px-4 py-2 text-stone-100 hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-amber-400";
 
-export function Lightbox({ src, alt, onClose, onChoose, onPrev, onNext }: Props) {
+export function Lightbox({ src, alt, onClose, onPrev, onNext, returnFocus, onChoose }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const [actualSize, setActualSize] = useState(false);
-  useModal(dialogRef, closeRef, onClose);
+  useModal(dialogRef, closeRef, onClose, returnFocus);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

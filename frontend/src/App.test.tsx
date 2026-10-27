@@ -335,6 +335,15 @@ describe("the zoomed view", () => {
     expect(painting(1)).toHaveFocus();
   });
 
+  it("returns focus to the painting it was showing", async () => {
+    const { user } = await start();
+    await user.click(painting(1));
+    await user.keyboard("{ArrowRight}{ArrowRight}");
+    await user.keyboard("{Escape}");
+    expect(painting(3)).toHaveAttribute("aria-pressed", "true");
+    expect(painting(3)).toHaveFocus();
+  });
+
   it("keeps keyboard focus inside", async () => {
     const { user } = await start();
     await user.click(painting(1));

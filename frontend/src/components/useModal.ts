@@ -1,19 +1,26 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-// What the help and the zoomed painting share as modal dialogs: focus starts on `initial` and
-// goes back to whatever opened the dialog when it closes, Escape closes it, and Tab cycles
-// through the dialog's own controls, since the page behind it is covered up.
+// What the help and the zoomed painting share as modal dialogs: focus starts on `initial`, Escape
+// closes the dialog, and Tab cycles through its own controls, since the page behind is covered
+// up. On closing, focus goes to `returnFocus()` if given, or back to whatever opened the dialog.
 export function useModal(
   dialog: RefObject<HTMLElement | null>,
   initial: RefObject<HTMLElement | null>,
   onClose: () => void,
+  returnFocus?: () => HTMLElement | null | undefined,
 ): void {
+  // The latest one, for the cleanup below that runs on closing.
+  const returnTo = useRef(returnFocus);
+  useEffect(() => {
+    returnTo.current = returnFocus;
+  });
+
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     initial.current?.focus();
-    return () => opener?.focus();
+    return () => (returnTo.current?.() ?? opener)?.focus();
   }, [initial]);
 
   useEffect(() => {
