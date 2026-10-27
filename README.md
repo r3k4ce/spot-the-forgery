@@ -56,8 +56,9 @@ could not be built, `2` missing API keys.
 3. Push to `main`. `pages.yml` deploys the site; `daily.yml` runs every day at 03:00 UTC, or
    from the Actions tab with an optional image budget.
 
-Expected running cost is about $4–5 a month (roughly 15 images and 10 short Claude calls a
-day).
+Expected running cost is about $4 a month on OpenRouter: 15 FLUX 3 Klein images a day at
+$0.009 each, and at most $0.27 on a day that hits the 30-image cap. The Claude calls run on
+the Anthropic API key and aren't counted here.
 
 ## Credits
 
