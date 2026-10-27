@@ -23,6 +23,9 @@ export default function App() {
   // Painting positions for a replay, per round; only for the puzzle that was replayed. Kept
   // here rather than in Game so a replay keeps its arrangement across a visit to the archive.
   const [shuffle, setShuffle] = useState<{ date: string; orders: number[][] } | null>(null);
+  // This visit's guesses per puzzle, so a game survives a trip to the archive even when
+  // storage can't be written. Game reads it once when it opens and writes on every guess.
+  const [played] = useState(() => new Map<string, number[]>());
   // First-time visitors get the rules before anything else.
   const [helpOpen, setHelpOpen] = useState(() => !hasSeenHelp());
   const requested = route.view === "puzzle" ? route.date : undefined;
@@ -113,6 +116,7 @@ export default function App() {
               puzzle={load.puzzle}
               answers={load.answers}
               dates={load.dates}
+              played={played}
               orders={shuffle?.date === load.puzzle.date ? shuffle.orders : undefined}
               onReplay={() => {
                 const { date, rounds } = load.puzzle;

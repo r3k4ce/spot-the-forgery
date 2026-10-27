@@ -239,6 +239,19 @@ it("keeps a guess made while the puzzle reloads, even when storage is full", asy
   expect(liveRegion()).toHaveTextContent("Correct");
 });
 
+it("keeps progress across a visit to the archive when storage is blocked", async () => {
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new DOMException("blocked", "SecurityError");
+  });
+  const { user } = await start();
+  await guess(user, 3);
+  await nextRound(user);
+  await user.click(screen.getByRole("link", { name: "Archive" }));
+  await screen.findByRole("heading", { name: "Archive" });
+  window.location.hash = "#/";
+  expect(await screen.findByRole("heading", { name: ROUND_2 })).toBeInTheDocument();
+});
+
 it("works from the keyboard", async () => {
   const { user } = await start();
   const confirm = screen.getByRole("button", { name: "This one is the fake" });
