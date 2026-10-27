@@ -1,0 +1,92 @@
+{
+  "date": "2026-10-27",
+  "number": 1,
+  "rounds": [
+    {
+      "groupKey": "artist:31127",
+      "kind": "artist",
+      "label": "Zhai Dakun",
+      "images": [
+        "88a7461353f3f071.jpg",
+        "29b602bb8702717a.jpg",
+        "b73ecf3580c4a9f7.jpg",
+        "9fb86a0a8a7d8f22.jpg"
+      ],
+      "realIds": [
+        153350,
+        153346,
+        153354
+      ],
+      "difficulty": 1
+    },
+    {
+      "groupKey": "artist:23575",
+      "kind": "artist",
+      "label": "Xiao Yuncong",
+      "images": [
+        "24ebdbd5873b7557.jpg",
+        "8622bbdaade40cb2.jpg",
+        "e166b2a0f8e62346.jpg",
+        "c8f77ee988218983.jpg"
+      ],
+      "realIds": [
+        132841,
+        132836,
+        132837
+      ],
+      "difficulty": 2
+    },
+    {
+      "groupKey": "culture:Northwestern India, Rajasthan, Rajput Kingdom of Bikaner|1600",
+      "kind": "culture",
+      "label": "Northwestern India, Rajasthan, Rajput Kingdom of Bikaner",
+      "images": [
+        "ce763f696ba2abba.jpg",
+        "848e011363bd2875.jpg",
+        "b39394c3b5ea1c9a.jpg",
+        "fd77d87d759befc7.jpg"
+      ],
+      "realIds": [
+        314496,
+        170907,
+        153542
+      ],
+      "difficulty": 3
+    },
+    {
+      "groupKey": "culture:China, Song dynasty (960-1279)|900",
+      "kind": "culture",
+      "label": "China, Song dynasty (960-1279)",
+      "images": [
+        "0fe566638aaf762b.jpg",
+        "e9e364dda1fe6fd9.jpg",
+        "2c96927cd5b9c6bd.jpg",
+        "8c5ebf9b53d70a62.jpg"
+      ],
+      "realIds": [
+        173671,
+        173644,
+        173574
+      ],
+      "difficulty": 4
+    },
+    {
+      "groupKey": "culture:India, Mughal Dynasty (1526-1756)|1700",
+      "kind": "culture",
+      "label": "India, Mughal Dynasty (1526-1756)",
+      "images": [
+        "3957008c1c9d3a77.jpg",
+        "8ed570e28cada3cc.jpg",
+        "76afce806e33bfca.jpg",
+        "cb3c7e9def5d0c4d.jpg"
+      ],
+      "realIds": [
+        101357,
+        146200,
+        101359
+      ],
+      "difficulty": 5
+    }
+  ],
+  "sealed": "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"
+}
