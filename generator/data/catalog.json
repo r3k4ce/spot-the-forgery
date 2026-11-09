@@ -1,5 +1,5 @@
 {
- "fetchedAt": "2026-10-27T02:31:39.696036+00:00",
+ "fetchedAt": "2026-11-09T03:06:46.585712+00:00",
  "groups": [
   {
    "key": "artist:11236",
@@ -5852,13 +5852,6 @@
      "page_url": "https://clevelandart.org/art/1980.187"
     },
     {
-     "id": 147934,
-     "title": "Buddha Amitābha with Two Attending Bodhisattvas",
-     "date": "1200s",
-     "image_url": "https://openaccess-cdn.clevelandart.org/1974.35/1974.35_web.jpg",
-     "page_url": "https://clevelandart.org/art/1974.35"
-    },
-    {
      "id": 163141,
      "title": "Album of Daoist and Buddhist Themes: Search the Mountain: Leaf 41",
      "date": "1200s",
@@ -10641,7 +10634,7 @@
     },
     {
      "id": 145958,
-     "title": "Red Amida",
+     "title": "Red Crystal Amida",
      "date": "1300s",
      "image_url": "https://openaccess-cdn.clevelandart.org/1971.164/1971.164_web.jpg",
      "page_url": "https://clevelandart.org/art/1971.164"
@@ -12901,13 +12894,6 @@
      "page_url": "https://clevelandart.org/art/1962.279.24.a"
     },
     {
-     "id": 137656,
-     "title": "Page from Tales of a Parrot (Tuti-nama): text page",
-     "date": "c. 1560",
-     "image_url": "https://openaccess-cdn.clevelandart.org/1962.279.240.a/1962.279.240.a_web.jpg",
-     "page_url": "https://clevelandart.org/art/1962.279.240.a"
-    },
-    {
      "id": 137671,
      "title": "Page from Tales of a Parrot (Tuti-nama): text page",
      "date": "c. 1560",
@@ -14222,6 +14208,13 @@
      "date": "c. 1560",
      "image_url": "https://openaccess-cdn.clevelandart.org/1962.279.24.b/1962.279.24.b_web.jpg",
      "page_url": "https://clevelandart.org/art/1962.279.24.b"
+    },
+    {
+     "id": 137656,
+     "title": "Page from Tales of a Parrot (Tuti-nama): text page",
+     "date": "c. 1560",
+     "image_url": "https://openaccess-cdn.clevelandart.org/1962.279.240.a/1962.279.240.a_web.jpg",
+     "page_url": "https://clevelandart.org/art/1962.279.240.a"
     },
     {
      "id": 137659,
@@ -15848,18 +15841,18 @@
      "page_url": "https://clevelandart.org/art/2002.6"
     },
     {
-     "id": 159647,
-     "title": "King Dasharatha confers with Kaikeyi, from the “Shangri” Ramayana",
-     "date": "c. 1700–1725",
-     "image_url": "https://openaccess-cdn.clevelandart.org/1996.361/1996.361_web.jpg",
-     "page_url": "https://clevelandart.org/art/1996.361"
-    },
-    {
      "id": 314140,
      "title": "Raja Bikram Singh of Guler smoking a hookah",
      "date": "c. 1678–90",
      "image_url": "https://openaccess-cdn.clevelandart.org/2018.89/2018.89_web.jpg",
      "page_url": "https://clevelandart.org/art/2018.89"
+    },
+    {
+     "id": 159647,
+     "title": "King Dasharatha confers with Kaikeyi, from the “Shangri” Ramayana",
+     "date": "c. 1700–1725",
+     "image_url": "https://openaccess-cdn.clevelandart.org/1996.361/1996.361_web.jpg",
+     "page_url": "https://clevelandart.org/art/1996.361"
     },
     {
      "id": 677517,
